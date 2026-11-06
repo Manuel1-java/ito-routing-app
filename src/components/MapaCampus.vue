@@ -1,6 +1,11 @@
 <template>
   <div class="map-wrap">
     <div ref="mapContainer" class="map-container"></div>
+    
+    <!-- NUEVO: Botón flotante para cambiar de vista -->
+    <button class="btn-vista" @click="toggleVista">
+      {{ vistaSatelite ? '🗺️ Ver Mapa Sencillo' : '🌍 Ver Satélite' }}
+    </button>
   </div>
 </template>
 
@@ -12,8 +17,19 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 const mapContainer = ref(null);
 let map = null;
 
+// Variable reactiva para saber qué vista está activa
+const vistaSatelite = ref(false);
+
+// Función que se ejecuta al hacer clic en el botón
+const toggleVista = () => {
+  if (!map) return;
+  vistaSatelite.value = !vistaSatelite.value;
+  const visibilidad = vistaSatelite.value ? 'visible' : 'none';
+  map.setLayoutProperty('capa-satelite', 'visibility', visibilidad);
+};
+
 onMounted(() => {
-const limitesITO = [
+  const limitesITO = [
     [-96.751517, 17.074415], // Suroeste
     [-96.736851, 17.081369]  // Noreste
   ];
@@ -21,29 +37,45 @@ const limitesITO = [
   map = new maplibregl.Map({
     container: mapContainer.value,
     style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-    center: [-96.744388, 17.077856], // Coordenadas del Tec de Oaxaca
-    zoom: 16.5, // Acercamos la cámara
-    minZoom: 15.5, // BLOQUEO: Evita que el usuario aleje demasiado la vista
-    maxBounds: limitesITO, // Bloqueo
+    center: [-96.744388, 17.077856],
+    zoom: 16.5,
+    minZoom: 15.5,
+    maxBounds: limitesITO,
     pitch: 0,
     bearing: 0
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
-  //Control de geolocalización
   const geolocateControl = new maplibregl.GeolocateControl({
-    positionOptions: {
-      enableHighAccuracy: true // Solicita usar el GPS del dispositivo para mayor precisión
-    },
-    trackUserLocation: true, // Actualiza el punto azul automáticamente si el usuario camina
-    showUserHeading: true // Muestra una flecha indicando hacia dónde mira el teléfono
+    positionOptions: { enableHighAccuracy: true },
+    trackUserLocation: true,
+    showUserHeading: true
   });
   
   map.addControl(geolocateControl, 'top-right');
 
-  //Dibujar el edificio 3D de prueba cuando el mapa cargue
   map.on('load', () => {
+    // 1. NUEVO: Agregar la fuente de imágenes satelitales (ESRI World Imagery)
+    map.addSource('fuente-satelite', {
+      'type': 'raster',
+      'tiles': [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+      ],
+      'tileSize': 256
+    });
+
+    // 2. NUEVO: Agregar la capa satelital (oculta por defecto)
+    map.addLayer({
+      'id': 'capa-satelite',
+      'type': 'raster',
+      'source': 'fuente-satelite',
+      'layout': {
+        'visibility': 'none' // Inicia en vista sencilla
+      }
+    });
+
+    // 3. El edificio 3D que ya tenías (se agrega DESPUÉS del satélite para que quede encima)
     map.addSource('edificio-prueba', {
       'type': 'geojson',
       'data': {
@@ -51,7 +83,7 @@ const limitesITO = [
         'features': [{
           'type': 'Feature',
           'properties': {
-            'altura': 15, // Altura en metros
+            'altura': 15,
             'color': '#1E88E5'
           },
           'geometry': {
@@ -61,7 +93,7 @@ const limitesITO = [
               [-96.744576, 17.075946],
               [-96.744755, 17.075854],
               [-96.744938, 17.076197],
-              [-96.744785, 17.076287] // Cierra el polígono
+              [-96.744785, 17.076287]
             ]]
           }
         }]
@@ -70,7 +102,7 @@ const limitesITO = [
 
     map.addLayer({
       'id': 'edificio-prueba-3d',
-      'type': 'fill-extrusion', // Esta es la propiedad que da el efecto 3D
+      'type': 'fill-extrusion',
       'source': 'edificio-prueba',
       'paint': {
         'fill-extrusion-color': ['get', 'color'],
@@ -97,5 +129,31 @@ onUnmounted(() => {
   position: absolute;
   width: 100%;
   height: 100%;
+}
+
+/* Estilos para el botón flotante */
+.btn-vista {
+  position: absolute;
+  bottom: 40px;
+  left: 20px;
+  z-index: 10; /* Lo mantiene por encima del mapa */
+  background-color: white;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 25px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-vista:hover {
+  background-color: #f0f0f0;
+  transform: translateY(-2px);
 }
 </style>
