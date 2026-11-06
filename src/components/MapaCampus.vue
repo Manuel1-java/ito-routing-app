@@ -22,6 +22,17 @@ onMounted(() => {
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  //Control de geolocalización
+  const geolocateControl = new maplibregl.GeolocateControl({
+    positionOptions: {
+      enableHighAccuracy: true // Solicita usar el GPS del dispositivo para mayor precisión
+    },
+    trackUserLocation: true, // Actualiza el punto azul automáticamente si el usuario camina
+    showUserHeading: true // Muestra una flecha indicando hacia dónde mira el teléfono
+  });
+  
+  map.addControl(geolocateControl, 'top-right');
 });
 
 onUnmounted(() => {
