@@ -1,7 +1,6 @@
 <template>
   <div class="buscador-container">
     <div class="input-wrapper">
-      <!-- Ícono de búsqueda (usamos un SVG básico) -->
       <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -9,15 +8,165 @@
       
       <input 
         type="text" 
+        v-model="busqueda"
+        @focus="inputEnFoco = true"
+        @blur="ocultarResultados"
         placeholder="Buscar salón, edificio o área..." 
         class="search-input"
       />
+    </div>
+
+    <!-- Panel de Resultados Desplegable -->
+    <div v-if="inputEnFoco && busqueda.length > 0" class="resultados-panel">
+      <ul v-if="resultadosFiltrados.length > 0" class="resultados-lista">
+        <!-- Usamos mousedown.prevent para que no se pierda el foco del input antes de hacer clic -->
+        <li 
+          v-for="lugar in resultadosFiltrados" 
+          :key="lugar.id" 
+          class="resultado-item"
+          @mousedown.prevent="seleccionarLugar(lugar)"
+        >
+          <div class="lugar-icono">{{ obtenerIcono(lugar.tipo) }}</div>
+          <div class="lugar-info">
+            <span class="lugar-nombre">{{ lugar.nombre }}</span>
+            <span class="lugar-descripcion">{{ lugar.descripcion }} • {{ lugar.tipo }}</span>
+          </div>
+        </li>
+      </ul>
+      <div v-else class="sin-resultados">
+        No se encontró ningún lugar para "{{ busqueda }}"
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-// Por ahora solo es visual, luego le agregaremos la lógica de autocompletado
+import { ref, computed } from 'vue';
+
+// Variables reactivas
+const busqueda = ref('');
+const inputEnFoco = ref(false);
+const emit = defineEmits(['seleccion']);
+// Base de datos oficial del ITO
+const lugaresITO = [
+  // Edificios principales
+  { id: '1', nombre: 'Edificio A', descripcion: 'Aulas / Administrativo', tipo: 'Edificio' },
+  { id: '2', nombre: 'Edificio B', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '3', nombre: 'Edificio C', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '4', nombre: 'Edificio E', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '5', nombre: 'Edificio F', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '6', nombre: 'Edificio G', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '7', nombre: 'Edificio H', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '8', nombre: 'Edificio I', descripcion: 'Depto. de Ing. en Sistemas y Computación', tipo: 'Edificio' },
+  { id: '9', nombre: 'Edificio J', descripcion: 'Depto. de Ciencias Económico-Administrativas', tipo: 'Edificio' },
+  { id: '10', nombre: 'Edificio K', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '11', nombre: 'Edificio L', descripcion: 'Depto. Ciencias de la Tierra', tipo: 'Edificio' },
+  { id: '12', nombre: 'Edificio Q', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '18', nombre: 'Edificio S', descripcion: 'Aulas', tipo: 'Edificio' },
+  { id: '45', nombre: 'Edificio de Cátedras CONACYT', descripcion: 'Investigación', tipo: 'Edificio' },
+
+  // Aulas específicas
+  { id: '13', nombre: 'Aulas 55, 56 y 57', descripcion: 'Cubículos de Doctorado', tipo: 'Aula' },
+  { id: '14', nombre: 'Aula Ñ', descripcion: 'Aula', tipo: 'Aula' },
+  { id: '16', nombre: 'Aulas M', descripcion: 'Aulas', tipo: 'Aula' },
+  { id: '17', nombre: 'Aulas O', descripcion: 'Aulas', tipo: 'Aula' },
+  { id: '19', nombre: 'Aulas P', descripcion: 'Aulas', tipo: 'Aula' },
+  { id: '38', nombre: 'Aulas Q8 y Q10', descripcion: 'Aulas', tipo: 'Aula' },
+
+  // Laboratorios
+  { id: '20', nombre: 'Laboratorio de Ingeniería Civil', descripcion: 'Prácticas Civil', tipo: 'Laboratorio' },
+  { id: '21A', nombre: 'Laboratorio de Ingeniería Industrial', descripcion: 'Prácticas Industrial', tipo: 'Laboratorio' },
+  { id: '22', nombre: 'Sala de Simulación', descripcion: 'Ingeniería Industrial', tipo: 'Laboratorio' },
+  { id: '24', nombre: 'Laboratorio de Química Pesada', descripcion: 'Prácticas Química', tipo: 'Laboratorio' },
+  { id: '25', nombre: 'Laboratorio de Físico-Química', descripcion: 'Prácticas Química', tipo: 'Laboratorio' },
+  { id: '26', nombre: 'Laboratorio de Ingeniería Mecánica', descripcion: 'Prácticas Mecánica', tipo: 'Laboratorio' },
+  { id: '27', nombre: 'Centro de Cómputo', descripcion: 'Equipos y Sistemas', tipo: 'Laboratorio' },
+  { id: '28', nombre: 'Laboratorio de Ingeniería Eléctrica', descripcion: 'Prácticas Eléctrica', tipo: 'Laboratorio' },
+
+  // Departamentos y Áreas Académicas
+  { id: '15', nombre: 'Unidad Académica de Posgrado', descripcion: 'DEPI', tipo: 'Departamento' },
+  { id: '23', nombre: 'Depto. de Ing. Química e Industrial', descripcion: 'Jefatura de Química e Industrial', tipo: 'Departamento' },
+  { id: '29', nombre: 'Depto. de Ingeniería Electrónica', descripcion: 'Jefatura de Electrónica', tipo: 'Departamento' },
+  { id: '32', nombre: 'Depto. de Ciencias Básicas', descripcion: 'Jefatura de Ciencias Básicas', tipo: 'Departamento' },
+  { id: '34', nombre: 'Depto. de Ing. Eléctrica y Mantenimiento', descripcion: 'Eléctrica y Servicios Generales', tipo: 'Departamento' },
+  { id: '35', nombre: 'Área Docente de Ingeniería Electrónica', descripcion: 'Docencia', tipo: 'Departamento' },
+  { id: '37', nombre: 'División de Estudios Profesionales', descripcion: 'Depto. de Servicios Escolares', tipo: 'Departamento' },
+  { id: '42', nombre: 'Depto. de Desarrollo Académico', descripcion: 'Desarrollo Académico', tipo: 'Departamento' },
+  { id: '46', nombre: 'Maestría en Construcción', descripcion: 'Posgrado', tipo: 'Departamento' },
+
+  // Administrativo y Maestros
+  { id: '33', nombre: 'Claustro Doctoral', descripcion: 'Área de Maestros', tipo: 'Administrativo' },
+  { id: '36', nombre: 'Dirección', descripcion: 'Dirección General', tipo: 'Administrativo' },
+  { id: '39', nombre: 'Sala de Maestros', descripcion: 'Ing. Gregorio Gutiérrez López', tipo: 'Administrativo' },
+  { id: '41', nombre: 'Cubículos de Maestros C', descripcion: 'Área Docente', tipo: 'Administrativo' },
+  { id: '43', nombre: 'Orientación Educativa y Titulación', descripcion: 'Acción Tutorial y Simulación Civil', tipo: 'Administrativo' },
+  { id: '44', nombre: 'Sección 61', descripcion: 'Sindicato', tipo: 'Administrativo' },
+  { id: '49', nombre: 'GRIQ', descripcion: 'Área de Investigación', tipo: 'Administrativo' },
+  { id: 'c-civil', nombre: 'Cubículos Dept. Civil', descripcion: 'Área Docente', tipo: 'Administrativo' },
+  { id: 'gric', nombre: 'GRIC', descripcion: 'Área de Investigación', tipo: 'Administrativo' },
+
+  // Instalaciones Especiales
+  { id: '30', nombre: 'Audiovisual de Licenciatura', descripcion: 'Sección 22', tipo: 'Audiovisual' },
+  { id: '31', nombre: 'Audiovisual de Ingeniería', descripcion: 'Sala de Proyecciones', tipo: 'Audiovisual' },
+  { id: '40', nombre: 'Centro de Información', descripcion: 'Biblioteca', tipo: 'Biblioteca' },
+
+  // Áreas Comunes y Puntos de Interés
+  { id: '47', nombre: 'Cafetería', descripcion: 'Alimentos y Bebidas', tipo: 'Comida' },
+  { id: '48', nombre: 'Gimnasio', descripcion: 'Deportes', tipo: 'Área Común' },
+  { id: 'musica', nombre: 'Área de Música', descripcion: 'Actividades Extraescolares', tipo: 'Área Común' },
+  { id: 'p-juarez', nombre: 'Plaza Benito Juárez', descripcion: 'Explanada', tipo: 'Punto de Interés' },
+  { id: 'p-civica', nombre: 'Plaza Cívica', descripcion: 'Explanada Central', tipo: 'Punto de Interés' },
+  { id: 'bancas', nombre: 'Bancas y Áreas de Descanso', descripcion: 'Puntos de Reunión', tipo: 'Área Común' },
+
+  // Servicios
+  { id: '50', nombre: 'Planta de Tratamiento', descripcion: 'Servicios Hídricos', tipo: 'Servicio' },
+  { id: 'puri', nombre: 'Purificadora', descripcion: 'Agua Potable', tipo: 'Servicio' },
+  { id: 'medico', nombre: 'Centro Médico', descripcion: 'Enfermería / Primeros Auxilios', tipo: 'Servicio' },
+  { id: 'caldera', nombre: 'Caldera', descripcion: 'Servicios Generales', tipo: 'Servicio' },
+  { id: 'bodega', nombre: 'Bodega', descripcion: 'Almacén', tipo: 'Servicio' },
+  { id: 'banos', nombre: 'Baños', descripcion: 'Sanitarios', tipo: 'Baños' }
+];
+
+// Lógica para filtrar resultados en tiempo real
+const resultadosFiltrados = computed(() => {
+  const termino = busqueda.value.toLowerCase().trim();
+  if (!termino) return [];
+  
+  return lugaresITO.filter(lugar => 
+    lugar.nombre.toLowerCase().includes(termino) ||
+    lugar.descripcion.toLowerCase().includes(termino) ||
+    lugar.tipo.toLowerCase().includes(termino)
+  );
+});
+
+// Función ampliada para mostrar íconos según el tipo de lugar
+const obtenerIcono = (tipo) => {
+  const iconos = {
+    'Edificio': '🏢',
+    'Aula': '📚',
+    'Laboratorio': '🔬',
+    'Departamento': '💼',
+    'Administrativo': '🧑‍🏫',
+    'Audiovisual': '📽️',
+    'Biblioteca': '📖',
+    'Comida': '☕',
+    'Baños': '🚻',
+    'Área Común': '🌳',
+    'Punto de Interés': '📍',
+    'Servicio': '⚙️'
+  };
+  return iconos[tipo] || '📌';
+};
+
+const seleccionarLugar = (lugar) => {
+  busqueda.value = lugar.nombre;
+  inputEnFoco.value = false;
+  emit('seleccion', lugar);
+};
+
+const ocultarResultados = () => {
+  inputEnFoco.value = false;
+};
 </script>
 
 <style scoped>
@@ -25,20 +174,22 @@
   position: absolute;
   top: 20px;
   left: 50%;
-  transform: translateX(-50%); /* Centra el buscador horizontalmente */
+  transform: translateX(-50%);
   width: 90%;
   max-width: 400px;
-  z-index: 10; /* Asegura que flote POR ENCIMA del mapa */
+  z-index: 10;
 }
 
 .input-wrapper {
   display: flex;
   align-items: center;
   background-color: white;
-  padding: 10px 15px;
+  padding: 12px 15px;
   border-radius: 25px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   transition: box-shadow 0.3s ease;
+  position: relative;
+  z-index: 11;
 }
 
 .input-wrapper:focus-within {
@@ -63,5 +214,73 @@
 
 .search-input::placeholder {
   color: #999;
+}
+
+/* Estilos del panel de resultados */
+.resultados-panel {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  width: 100%;
+  background: white;
+  border-radius: 0 0 20px 20px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+  padding-top: 25px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.resultados-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.resultado-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.resultado-item:last-child {
+  border-bottom: none;
+}
+
+.resultado-item:hover {
+  background-color: #f5f8fa;
+}
+
+.lugar-icono {
+  font-size: 20px;
+  margin-right: 15px;
+}
+
+.lugar-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.lugar-nombre {
+  font-weight: 600;
+  color: #333;
+  font-size: 15px;
+}
+
+/* Cambiado de lugar-edificio a lugar-descripcion */
+.lugar-descripcion {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.sin-resultados {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
 }
 </style>
