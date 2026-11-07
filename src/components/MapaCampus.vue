@@ -117,6 +117,21 @@ onMounted(() => {
 onUnmounted(() => {
   if (map) map.remove();
 });
+
+const volarACoordenada = (lng, lat) => {
+  if (!map) return;
+  
+  map.flyTo({
+    center: [lng, lat],
+    zoom: 18.5,       // Nos acercamos para ver el salón
+    pitch: 60,        // Inclinación a 60 grados (¡activa el 3D!)
+    bearing: -20,     // Rotamos un poco la cámara para apreciar el volumen
+    duration: 2500,   // Duración de la animación (2.5 segundos)
+    essential: true
+  });
+};
+
+defineExpose({ volarACoordenada });
 </script>
 
 <style scoped>
