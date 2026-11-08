@@ -55,8 +55,12 @@ onMounted(() => {
   
   map.addControl(geolocateControl, 'top-right');
 
-  map.on('load', () => {
-    // 1. NUEVO: Agregar la fuente de imágenes satelitales (ESRI World Imagery)
+map.on('load', () => {
+    // ==========================================
+    // 1. FUENTES DE DATOS (Las bases)
+    // ==========================================
+    
+    // Satélite
     map.addSource('fuente-satelite', {
       'type': 'raster',
       'tiles': [
@@ -65,50 +69,36 @@ onMounted(() => {
       'tileSize': 256
     });
 
-    // 2. NUEVO: Agregar la capa satelital (oculta por defecto)
+    // Tu archivo GeoJSON (Los edificios reales de QGIS)
+    map.addSource('edificios-ito', {
+      type: 'geojson',
+      data: '/edificios.geojson'
+    });
+
+    // ==========================================
+    // 2. CAPAS VISUALES (Se dibujan de abajo hacia arriba)
+    // ==========================================
+
+    // Primero agregamos el satélite (para que quede pegado al piso)
     map.addLayer({
       'id': 'capa-satelite',
       'type': 'raster',
       'source': 'fuente-satelite',
       'layout': {
-        'visibility': 'none' // Inicia en vista sencilla
+        'visibility': 'none' // Inicia apagado
       }
     });
 
-    // 3. El edificio 3D que ya tenías (se agrega DESPUÉS del satélite para que quede encima)
-    map.addSource('edificio-prueba', {
-      'type': 'geojson',
-      'data': {
-        'type': 'FeatureCollection',
-        'features': [{
-          'type': 'Feature',
-          'properties': {
-            'altura': 15,
-            'color': '#1E88E5'
-          },
-          'geometry': {
-            'type': 'Polygon',
-            'coordinates': [[
-              [-96.744785, 17.076287],
-              [-96.744576, 17.075946],
-              [-96.744755, 17.075854],
-              [-96.744938, 17.076197],
-              [-96.744785, 17.076287]
-            ]]
-          }
-        }]
-      }
-    });
-
+    // Encima del satélite, levantamos tus edificios 3D
     map.addLayer({
-      'id': 'edificio-prueba-3d',
-      'type': 'fill-extrusion',
-      'source': 'edificio-prueba',
-      'paint': {
-        'fill-extrusion-color': ['get', 'color'],
-        'fill-extrusion-height': ['get', 'altura'],
-        'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.8
+      id: 'edificios-3d',
+      type: 'fill-extrusion',
+      source: 'edificios-ito',
+      paint: {
+        'fill-extrusion-color': '#1E88E5',
+        'fill-extrusion-height': ['to-number', ['get', 'altura']], 
+        'fill-extrusion-base': ['to-number', ['get', 'base']],     
+        'fill-extrusion-opacity': 0.85              
       }
     });
   });
