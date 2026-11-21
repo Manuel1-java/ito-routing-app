@@ -11,50 +11,100 @@
 
     <TarjetaDestino 
       :lugar="lugarActivo" 
-      @cerrar="lugarActivo = null"
+      :ruta="rutaCalculada"
+      @cerrar="cerrarDestino"
       @trazar-ruta="iniciarRuta"
     />
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import MapaCampus from './components/MapaCampus.vue'
 import BuscadorSalones from './components/BuscadorSalones.vue'
 import TarjetaDestino from './components/TarjetaDestino.vue'
-import ControlesLaterales from './components/ControlesLaterales.vue' // Importamos el nuevo componente
+import ControlesLaterales from './components/ControlesLaterales.vue'
+import { calcularRuta } from './utils/pathfinder'
 
 const lugarActivo = ref(null)
-const mapaRef = ref(null) 
+const mapaRef = ref(null)
+const rutasGeojson = ref(null)
+const rutaCalculada = ref(null)
+const navegando = ref(false)
 
 const pisoActual = ref('PB')
 const rutaAccesible = ref(false)
 
+onMounted(async () => {
+  try {
+    const res = await fetch('/rutas.geojson')
+    rutasGeojson.value = await res.json()
+  } catch (error) {
+    console.error('Error al cargar rutas.geojson:', error)
+  }
+})
+
 const manejarSeleccion = (lugar) => {
   lugarActivo.value = lugar
-  
-  if (lugar.id === '8' && mapaRef.value) {
-    mapaRef.value.volarACoordenada(-96.744785, 17.076287) 
+  rutaCalculada.value = null
+  navegando.value = false
+
+  if (mapaRef.value) {
+    mapaRef.value.limpiarRuta()
+    mapaRef.value.resaltarEdificio(lugar.edificio_id)
+
+    if (lugar.coordenadas && lugar.coordenadas.length === 2) {
+      mapaRef.value.volarACoordenada(lugar.coordenadas[0], lugar.coordenadas[1])
+    }
   }
 }
 
-const iniciarRuta = (lugar) => {
-  let mensaje = `Simulando cálculo de ruta hacia: ${lugar.nombre}`;
-  if (rutaAccesible.value) {
-    mensaje += `\n⚠️ Modo Accesible Activado: Calculando ruta sin escaleras.`;
+const iniciarRuta = async (lugar) => {
+  if (!lugar?.coordenadas || !mapaRef.value) return
+
+  if (!rutasGeojson.value) {
+    const res = await fetch('/rutas.geojson')
+    rutasGeojson.value = await res.json()
   }
-  alert(mensaje);
+
+  const origen = mapaRef.value.obtenerUbicacionOrigen()
+  const resultado = calcularRuta(
+    rutasGeojson.value,
+    origen.coords,
+    lugar.coordenadas,
+    rutaAccesible.value
+  )
+
+  if (!resultado) {
+    alert('No se encontró un camino conectado hasta ese punto con los filtros actuales.')
+    return
+  }
+
+  rutaCalculada.value = {
+    ...resultado,
+    origenNombre: origen.nombre,
+    desdeGPS: origen.esGPS
+  }
+  navegando.value = true
+  mapaRef.value.dibujarRuta(resultado.coordenadas)
+}
+
+const cerrarDestino = () => {
+  lugarActivo.value = null
+  rutaCalculada.value = null
+  navegando.value = false
+  mapaRef.value?.limpiarRuta()
 }
 
 const manejarCambioPiso = (piso) => {
   pisoActual.value = piso
-  console.log(`Vista cambiada a: ${piso}`)
-  // Aquí luego le diremos a MapLibre: map.setFilter('salones-capa', ['==', 'piso', piso])
 }
 
 const manejarAccesibilidad = (estado) => {
   rutaAccesible.value = estado
-  console.log(`Ruta para silla de ruedas: ${estado ? 'Activada' : 'Desactivada'}`)
+  if (navegando.value && lugarActivo.value) {
+    iniciarRuta(lugarActivo.value)
+  }
 }
 </script>
 

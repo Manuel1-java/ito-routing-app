@@ -1,8 +1,22 @@
 <template>
   <div class="map-wrap">
     <div ref="mapContainer" class="map-container"></div>
+
+    <!-- Selector de punto de partida para probar cualquier entrada o usar GPS -->
+    <div class="selector-origen">
+      <label for="select-origen">🚩 Salir desde:</label>
+      <select id="select-origen" v-model="origenSeleccionado">
+        <option value="auto">📍 Automático (GPS / Entrada cercana)</option>
+        <option
+          v-for="(acceso, idx) in ACCESOS_CAMPUS"
+          :key="acceso.nombre"
+          :value="idx"
+        >
+          {{ acceso.nombre }}
+        </option>
+      </select>
+    </div>
     
-    <!-- NUEVO: Botón flotante para cambiar de vista -->
     <button class="btn-vista" @click="toggleVista">
       {{ vistaSatelite ? '🗺️ Ver Mapa Sencillo' : '🌍 Ver Satélite' }}
     </button>
@@ -17,10 +31,62 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 const mapContainer = ref(null);
 let map = null;
 
-// Variable reactiva para saber qué vista está activa
 const vistaSatelite = ref(false);
+const ubicacionUsuario = ref(null);
+const origenSeleccionado = ref('auto');
 
-// Función que se ejecuta al hacer clic en el botón
+const ACCESOS_CAMPUS = [
+  {
+    nombre: 'Acceso Puente del Tecnológico / Riberas',
+    coords: [-96.74630669434635, 17.078456917290136]
+  },
+  {
+    nombre: 'Acceso Av. Tecnológico (Norte)',
+    coords: [-96.74538887234341, 17.079018506015785]
+  },
+  {
+    nombre: 'Acceso Riveras y Juan de Dios Bátiz',
+    coords: [-96.74475163449951, 17.075831796177102]
+  },
+  {
+    nombre: 'Acceso Juan de Dios Bátiz / Ferrocarril',
+    coords: [-96.74320435437524, 17.076342002947552]
+  },
+  {
+    nombre: 'Acceso Calzada Madero / Ferrocarril',
+    coords: [-96.74339672315243, 17.079301983144862]
+  }
+];
+
+const distanciaMetros = (c1, c2) => {
+  const R = 6371000;
+  const rad = Math.PI / 180;
+  const lat1 = c1[1] * rad;
+  const lat2 = c2[1] * rad;
+  const dLat = (c2[1] - c1[1]) * rad;
+  const dLon = (c2[0] - c1[0]) * rad;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const solicitarUbicacionGPS = () => {
+  if (!('geolocation' in navigator)) return;
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      ubicacionUsuario.value = [pos.coords.longitude, pos.coords.latitude];
+    },
+    (err) => {
+      console.warn('No se pudo obtener GPS preciso:', err.message);
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+  );
+};
+
 const toggleVista = () => {
   if (!map) return;
   vistaSatelite.value = !vistaSatelite.value;
@@ -29,9 +95,11 @@ const toggleVista = () => {
 };
 
 onMounted(() => {
+  solicitarUbicacionGPS();
+
   const limitesITO = [
-    [-96.751517, 17.074415], // Suroeste
-    [-96.736851, 17.081369]  // Noreste
+    [-96.751517, 17.074415],
+    [-96.736851, 17.081369]
   ];
 
   map = new maplibregl.Map({
@@ -52,53 +120,85 @@ onMounted(() => {
     trackUserLocation: true,
     showUserHeading: true
   });
+
+  geolocateControl.on('geolocate', (e) => {
+    ubicacionUsuario.value = [e.coords.longitude, e.coords.latitude];
+  });
   
   map.addControl(geolocateControl, 'top-right');
 
-map.on('load', () => {
-    // ==========================================
-    // 1. FUENTES DE DATOS (Las bases)
-    // ==========================================
-    
-    // Satélite
+  map.on('load', () => {
     map.addSource('fuente-satelite', {
-      'type': 'raster',
-      'tiles': [
+      type: 'raster',
+      tiles: [
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
       ],
-      'tileSize': 256
+      tileSize: 256
     });
 
-    // Tu archivo GeoJSON (Los edificios reales de QGIS)
     map.addSource('edificios-ito', {
       type: 'geojson',
       data: '/edificios.geojson'
     });
 
-    // ==========================================
-    // 2. CAPAS VISUALES (Se dibujan de abajo hacia arriba)
-    // ==========================================
-
-    // Primero agregamos el satélite (para que quede pegado al piso)
-    map.addLayer({
-      'id': 'capa-satelite',
-      'type': 'raster',
-      'source': 'fuente-satelite',
-      'layout': {
-        'visibility': 'none' // Inicia apagado
-      }
+    map.addSource('ruta-activa', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
     });
 
-    // Encima del satélite, levantamos tus edificios 3D
+    map.addLayer({
+      id: 'capa-satelite',
+      type: 'raster',
+      source: 'fuente-satelite',
+      layout: { visibility: 'none' }
+    });
+
     map.addLayer({
       id: 'edificios-3d',
       type: 'fill-extrusion',
       source: 'edificios-ito',
       paint: {
         'fill-extrusion-color': '#1E88E5',
-        'fill-extrusion-height': ['to-number', ['get', 'altura']], 
-        'fill-extrusion-base': ['to-number', ['get', 'base']],     
-        'fill-extrusion-opacity': 0.85              
+        'fill-extrusion-height': ['to-number', ['get', 'altura']],
+        'fill-extrusion-base': ['to-number', ['get', 'base']],
+        'fill-extrusion-opacity': 0.85
+      }
+    });
+
+    map.addLayer({
+      id: 'ruta-activa-borde',
+      type: 'line',
+      source: 'ruta-activa',
+      filter: ['==', ['geometry-type'], 'LineString'],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#FFFFFF', 'line-width': 8, 'line-opacity': 0.9 }
+    });
+
+    map.addLayer({
+      id: 'ruta-activa-linea',
+      type: 'line',
+      source: 'ruta-activa',
+      filter: ['==', ['geometry-type'], 'LineString'],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#FF6D00', 'line-width': 5 }
+    });
+
+    map.addLayer({
+      id: 'ruta-extremos',
+      type: 'circle',
+      source: 'ruta-activa',
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': 7,
+        'circle-color': [
+          'match',
+          ['get', 'rol'],
+          'inicio', '#10B981',
+          'fin', '#EF4444',
+          '#FF6D00'
+        ],
+        'circle-stroke-width': 2.5,
+        'circle-stroke-color': '#FFFFFF'
       }
     });
   });
@@ -108,20 +208,138 @@ onUnmounted(() => {
   if (map) map.remove();
 });
 
+const obtenerUbicacionOrigen = () => {
+  if (origenSeleccionado.value !== 'auto') {
+    const manual = ACCESOS_CAMPUS[Number(origenSeleccionado.value)];
+    return { coords: manual.coords, nombre: manual.nombre, esGPS: false };
+  }
+
+  if (ubicacionUsuario.value) {
+    const [lng, lat] = ubicacionUsuario.value;
+
+    const dentroDeCampus =
+      lng >= -96.7466 && lng <= -96.7430 &&
+      lat >= 17.0757 && lat <= 17.0798;
+
+    if (dentroDeCampus) {
+      return {
+        coords: ubicacionUsuario.value,
+        nombre: 'Tu ubicación actual',
+        esGPS: true
+      };
+    }
+
+    let accesoMasCercano = ACCESOS_CAMPUS[0];
+    let menorDistancia = Infinity;
+
+    for (const acceso of ACCESOS_CAMPUS) {
+      const dist = distanciaMetros(ubicacionUsuario.value, acceso.coords);
+      if (dist < menorDistancia) {
+        menorDistancia = dist;
+        accesoMasCercano = acceso;
+      }
+    }
+
+    return {
+      coords: accesoMasCercano.coords,
+      nombre: accesoMasCercano.nombre,
+      esGPS: true
+    };
+  }
+
+  return {
+    coords: ACCESOS_CAMPUS[0].coords,
+    nombre: ACCESOS_CAMPUS[0].nombre,
+    esGPS: false
+  };
+};
+
 const volarACoordenada = (lng, lat) => {
   if (!map) return;
-  
+
   map.flyTo({
     center: [lng, lat],
-    zoom: 18.5,       // Nos acercamos para ver el salón
-    pitch: 60,        // Inclinación a 60 grados (¡activa el 3D!)
-    bearing: -20,     // Rotamos un poco la cámara para apreciar el volumen
-    duration: 2500,   // Duración de la animación (2.5 segundos)
+    zoom: 18.5,
+    pitch: 60,
+    bearing: -20,
+    duration: 2000,
     essential: true
   });
 };
 
-defineExpose({ volarACoordenada });
+const resaltarEdificio = (edificioId) => {
+  if (!map || !map.getLayer('edificios-3d')) return;
+
+  if (!edificioId) {
+    map.setPaintProperty('edificios-3d', 'fill-extrusion-color', '#1E88E5');
+    return;
+  }
+
+  map.setPaintProperty('edificios-3d', 'fill-extrusion-color', [
+    'case',
+    ['==', ['to-string', ['get', 'id']], String(edificioId)],
+    '#F59E0B',
+    '#1E88E5'
+  ]);
+};
+
+const dibujarRuta = (coordenadas) => {
+  if (!map || !coordenadas || coordenadas.length < 2) return;
+  const fuente = map.getSource('ruta-activa');
+  if (!fuente) return;
+
+  const inicio = coordenadas[0];
+  const fin = coordenadas[coordenadas.length - 1];
+
+  fuente.setData({
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { rol: 'linea' },
+        geometry: { type: 'LineString', coordinates: coordenadas }
+      },
+      {
+        type: 'Feature',
+        properties: { rol: 'inicio' },
+        geometry: { type: 'Point', coordinates: inicio }
+      },
+      {
+        type: 'Feature',
+        properties: { rol: 'fin' },
+        geometry: { type: 'Point', coordinates: fin }
+      }
+    ]
+  });
+
+  const bounds = coordenadas.reduce(
+    (b, coord) => b.extend(coord),
+    new maplibregl.LngLatBounds(coordenadas[0], coordenadas[0])
+  );
+
+  map.fitBounds(bounds, {
+    padding: { top: 140, bottom: 220, left: 60, right: 60 },
+    pitch: 55,
+    duration: 1800
+  });
+};
+
+const limpiarRuta = () => {
+  if (!map) return;
+  const fuente = map.getSource('ruta-activa');
+  if (fuente) {
+    fuente.setData({ type: 'FeatureCollection', features: [] });
+  }
+  resaltarEdificio(null);
+};
+
+defineExpose({
+  volarACoordenada,
+  resaltarEdificio,
+  dibujarRuta,
+  limpiarRuta,
+  obtenerUbicacionOrigen
+});
 </script>
 
 <style scoped>
@@ -136,12 +354,39 @@ defineExpose({ volarACoordenada });
   height: 100%;
 }
 
-/* Estilos para el botón flotante */
+.selector-origen {
+  position: absolute;
+  bottom: 92px;
+  left: 20px;
+  z-index: 10;
+  background-color: white;
+  padding: 8px 14px;
+  border-radius: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.selector-origen select {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E88E5;
+  outline: none;
+  cursor: pointer;
+  max-width: 210px;
+}
+
 .btn-vista {
   position: absolute;
   bottom: 40px;
   left: 20px;
-  z-index: 10; /* Lo mantiene por encima del mapa */
+  z-index: 10;
   background-color: white;
   border: none;
   padding: 12px 18px;

@@ -1,0 +1,587 @@
+[
+  {
+    "id": "acceso-tec",
+    "nombre": "Acceso Principal (Av. Tecnológico)",
+    "descripcion": "Entrada Peatonal Norte",
+    "tipo": "Punto de Interés",
+    "edificio_id": null,
+    "coordenadas": [-96.74475163449951, 17.075831796177102],
+    "palabras_clave": ["entrada", "caseta", "tecnologico", "acceso"]
+  },
+  {
+    "id": "acceso-madero",
+    "nombre": "Acceso Calzada Madero",
+    "descripcion": "Entrada Oriente / Ferrocarril",
+    "tipo": "Punto de Interés",
+    "edificio_id": null,
+    "coordenadas": [-96.74320435437524, 17.076342002947552],
+    "palabras_clave": ["entrada", "madero", "ferrocarril", "acceso"]
+  },
+  {
+    "id": "acceso-riberas",
+    "nombre": "Acceso Riberas del Atoyac",
+    "descripcion": "Entrada Poniente",
+    "tipo": "Punto de Interés",
+    "edificio_id": null,
+    "coordenadas": [-96.74630669434635, 17.078456917290136],
+    "palabras_clave": ["entrada", "riberas", "atoyac", "acceso"]
+  },
+  {
+    "id": "acceso-batiz",
+    "nombre": "Acceso Juan de Dios Bátiz",
+    "descripcion": "Entrada Sur",
+    "tipo": "Punto de Interés",
+    "edificio_id": null,
+    "coordenadas": [-96.74339672315243, 17.079301983144862],
+    "palabras_clave": ["entrada", "batiz", "sur", "acceso"]
+  },
+  {
+    "id": "1",
+    "nombre": "Edificio A",
+    "descripcion": "Aulas / Administrativo",
+    "tipo": "Edificio",
+    "edificio_id": "1",
+    "coordenadas": [-96.74564553758616, 17.078390118697474],
+    "palabras_clave": ["edificio a", "aulas a"]
+  },
+  {
+    "id": "2",
+    "nombre": "Edificio B",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "2",
+    "coordenadas": [-96.74486935580379, 17.078228812730476],
+    "palabras_clave": ["edificio b", "aulas b"]
+  },
+  {
+    "id": "3",
+    "nombre": "Edificio C",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "3",
+    "coordenadas": [-96.74494686668211, 17.078009025477108],
+    "palabras_clave": ["edificio c", "aulas c"]
+  },
+  {
+    "id": "4",
+    "nombre": "Edificio E",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "4",
+    "coordenadas": [-96.74406998979406, 17.07689583211677],
+    "palabras_clave": ["edificio e", "aulas e"]
+  },
+  {
+    "id": "5",
+    "nombre": "Edificio F",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "5",
+    "coordenadas": [-96.74410434736564, 17.076787079959377],
+    "palabras_clave": ["edificio f", "aulas f"]
+  },
+  {
+    "id": "6",
+    "nombre": "Edificio G",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "6",
+    "coordenadas": [-96.74417015534174, 17.076535953277563],
+    "palabras_clave": ["edificio g", "aulas g"]
+  },
+  {
+    "id": "7",
+    "nombre": "Edificio H",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "7",
+    "coordenadas": [-96.74470611472148, 17.076602972878188],
+    "palabras_clave": ["edificio h", "aulas h"]
+  },
+  {
+    "id": "8",
+    "nombre": "Edificio I",
+    "descripcion": "Depto. de Ing. en Sistemas y Computación",
+    "tipo": "Edificio",
+    "edificio_id": "8",
+    "coordenadas": [-96.74484833950723, 17.07626924642078],
+    "palabras_clave": ["isc", "sistemas", "computacion", "edificio i"]
+  },
+  {
+    "id": "9",
+    "nombre": "Edificio J",
+    "descripcion": "Depto. de Ciencias Económico-Administrativas",
+    "tipo": "Edificio",
+    "edificio_id": "9",
+    "coordenadas": [-96.74449548987599, 17.07632950808787],
+    "palabras_clave": ["gestion", "administracion", "cea", "edificio j"]
+  },
+  {
+    "id": "10",
+    "nombre": "Edificio K",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "10",
+    "coordenadas": [-96.74380306640181, 17.07652005469805],
+    "palabras_clave": ["edificio k", "aulas k"]
+  },
+  {
+    "id": "11",
+    "nombre": "Edificio L",
+    "descripcion": "Depto. Ciencias de la Tierra",
+    "tipo": "Edificio",
+    "edificio_id": "11",
+    "coordenadas": [-96.74407287727807, 17.078023863122965],
+    "palabras_clave": ["civil", "ciencias de la tierra", "edificio l"]
+  },
+  {
+    "id": "12",
+    "nombre": "Edificio Q",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "12",
+    "coordenadas": [-96.74366939743409, 17.077114341461748],
+    "palabras_clave": ["edificio q", "aulas q"]
+  },
+  {
+    "id": "18",
+    "nombre": "Edificio S",
+    "descripcion": "Aulas",
+    "tipo": "Edificio",
+    "edificio_id": "18",
+    "coordenadas": [-96.7436687466602, 17.07648777631054],
+    "palabras_clave": ["edificio s", "aulas s"]
+  },
+  {
+    "id": "45",
+    "nombre": "Edificio de Cátedras CONACYT",
+    "descripcion": "Investigación",
+    "tipo": "Edificio",
+    "edificio_id": "45",
+    "coordenadas": [-96.74592940517955, 17.078841235194005],
+    "palabras_clave": ["conacyt", "catedras", "investigacion"]
+  },
+  {
+    "id": "13",
+    "nombre": "Aulas 55, 56 y 57",
+    "descripcion": "Cubículos de Doctorado",
+    "tipo": "Aula",
+    "edificio_id": "13",
+    "coordenadas": [-96.7439431182231, 17.079269855497355],
+    "palabras_clave": ["55", "56", "57", "doctorado"]
+  },
+  {
+    "id": "14",
+    "nombre": "Aula Ñ",
+    "descripcion": "Aula",
+    "tipo": "Aula",
+    "edificio_id": "14",
+    "coordenadas": [-96.74366367062339, 17.079291570761804],
+    "palabras_clave": ["aula ñ", "salon ñ"]
+  },
+  {
+    "id": "16",
+    "nombre": "Aulas M",
+    "descripcion": "Aulas M1, M2, M3 y M4",
+    "tipo": "Aula",
+    "edificio_id": "61",
+    "coordenadas": [-96.74385148398307, 17.077878350069582],
+    "palabras_clave": ["m1", "m2", "m3", "m4", "aulas m"]
+  },
+  {
+    "id": "17",
+    "nombre": "Aulas O",
+    "descripcion": "Aulas",
+    "tipo": "Aula",
+    "edificio_id": "17",
+    "coordenadas": [-96.74338344736405, 17.078131370978188],
+    "palabras_clave": ["aula o", "aulas o"]
+  },
+  {
+    "id": "19",
+    "nombre": "Aulas P",
+    "descripcion": "Aulas",
+    "tipo": "Aula",
+    "edificio_id": "19",
+    "coordenadas": [-96.7434344680411, 17.07793665941477],
+    "palabras_clave": ["aula p", "aulas p"]
+  },
+  {
+    "id": "38",
+    "nombre": "Aulas Q8 y Q10",
+    "descripcion": "Aulas",
+    "tipo": "Aula",
+    "edificio_id": "39",
+    "coordenadas": [-96.74410908253533, 17.07620929454427],
+    "palabras_clave": ["q8", "q10"]
+  },
+  {
+    "id": "20",
+    "nombre": "Laboratorio de Ingeniería Civil",
+    "descripcion": "Prácticas Civil",
+    "tipo": "Laboratorio",
+    "edificio_id": "20",
+    "coordenadas": [-96.7443035115631, 17.078735549505833],
+    "palabras_clave": ["civil", "materiales"]
+  },
+  {
+    "id": "21A",
+    "nombre": "Laboratorio de Ingeniería Industrial",
+    "descripcion": "Prácticas Industrial",
+    "tipo": "Laboratorio",
+    "edificio_id": "22",
+    "coordenadas": [-96.74360835483836, 17.076621054813838],
+    "palabras_clave": ["industrial"]
+  },
+  {
+    "id": "22",
+    "nombre": "Sala de Simulación",
+    "descripcion": "Ingeniería Industrial",
+    "tipo": "Laboratorio",
+    "edificio_id": "22",
+    "coordenadas": [-96.74481319771437, 17.079209703399918],
+    "palabras_clave": ["simulacion", "industrial"]
+  },
+  {
+    "id": "24",
+    "nombre": "Laboratorio de Química Pesada",
+    "descripcion": "Prácticas Química",
+    "tipo": "Laboratorio",
+    "edificio_id": "24",
+    "coordenadas": [-96.74454039327796, 17.07856270394686],
+    "palabras_clave": ["quimica pesada"]
+  },
+  {
+    "id": "25",
+    "nombre": "Laboratorio de Físico-Química",
+    "descripcion": "Prácticas Química",
+    "tipo": "Laboratorio",
+    "edificio_id": "25",
+    "coordenadas": [-96.74433305670003, 17.078036097673085],
+    "palabras_clave": ["fisicoquimica", "fisico quimica"]
+  },
+  {
+    "id": "26",
+    "nombre": "Laboratorio de Ingeniería Mecánica",
+    "descripcion": "Prácticas Mecánica",
+    "tipo": "Laboratorio",
+    "edificio_id": "26",
+    "coordenadas": [-96.74448208393277, 17.078740235078214],
+    "palabras_clave": ["mecanica", "talleres"]
+  },
+  {
+    "id": "27",
+    "nombre": "Centro de Cómputo",
+    "descripcion": "Equipos y Sistemas",
+    "tipo": "Laboratorio",
+    "edificio_id": "27",
+    "coordenadas": [-96.74436077966999, 17.079008874561435],
+    "palabras_clave": ["cc", "computadoras", "redes"]
+  },
+  {
+    "id": "28",
+    "nombre": "Laboratorio de Ingeniería Eléctrica",
+    "descripcion": "Prácticas Eléctrica",
+    "tipo": "Laboratorio",
+    "edificio_id": "28",
+    "coordenadas": [-96.74475560113133, 17.078995188945793],
+    "palabras_clave": ["electrica"]
+  },
+  {
+    "id": "15",
+    "nombre": "Unidad Académica de Posgrado",
+    "descripcion": "DEPI",
+    "tipo": "Departamento",
+    "edificio_id": "15",
+    "coordenadas": [-96.74497927522437, 17.078615286481373],
+    "palabras_clave": ["depi", "posgrado", "maestria"]
+  },
+  {
+    "id": "23",
+    "nombre": "Depto. de Ing. Química e Industrial",
+    "descripcion": "Jefatura de Química e Industrial",
+    "tipo": "Departamento",
+    "edificio_id": "23",
+    "coordenadas": [-96.74392450081933, 17.079345715153767],
+    "palabras_clave": ["quimica", "industrial", "jefatura"]
+  },
+  {
+    "id": "29",
+    "nombre": "Depto. de Ingeniería Electrónica",
+    "descripcion": "Jefatura de Electrónica",
+    "tipo": "Departamento",
+    "edificio_id": "29",
+    "coordenadas": [-96.74375399804649, 17.07860214084775],
+    "palabras_clave": ["electronica", "jefatura"]
+  },
+  {
+    "id": "32",
+    "nombre": "Depto. de Ciencias Básicas",
+    "descripcion": "Jefatura de Ciencias Básicas",
+    "tipo": "Departamento",
+    "edificio_id": "32",
+    "coordenadas": [-96.74468084543715, 17.07706362238628],
+    "palabras_clave": ["matematicas", "fisica", "asesorias"]
+  },
+  {
+    "id": "34",
+    "nombre": "Depto. de Ing. Eléctrica y Mantenimiento",
+    "descripcion": "Eléctrica y Servicios Generales",
+    "tipo": "Departamento",
+    "edificio_id": "34",
+    "coordenadas": [-96.74538887234341, 17.079018506015785],
+    "palabras_clave": ["electrica", "mantenimiento"]
+  },
+  {
+    "id": "35",
+    "nombre": "Área Docente de Ingeniería Electrónica",
+    "descripcion": "Docencia",
+    "tipo": "Departamento",
+    "edificio_id": "35",
+    "coordenadas": [-96.74421963704872, 17.078311414679046],
+    "palabras_clave": ["docencia", "electronica"]
+  },
+  {
+    "id": "37",
+    "nombre": "División de Estudios Profesionales",
+    "descripcion": "Depto. de Servicios Escolares",
+    "tipo": "Departamento",
+    "edificio_id": "37",
+    "coordenadas": [-96.7450010110741, 17.07755296309863],
+    "palabras_clave": ["servicios escolares", "kardex", "constancias", "ventanillas"]
+  },
+  {
+    "id": "42",
+    "nombre": "Depto. de Desarrollo Académico",
+    "descripcion": "Desarrollo Académico",
+    "tipo": "Departamento",
+    "edificio_id": "42",
+    "coordenadas": [-96.74556119728327, 17.077760169521728],
+    "palabras_clave": ["tutorias", "psicologia"]
+  },
+  {
+    "id": "46",
+    "nombre": "Maestría en Construcción",
+    "descripcion": "Posgrado",
+    "tipo": "Departamento",
+    "edificio_id": "46",
+    "coordenadas": [-96.74591638970071, 17.078848003243003],
+    "palabras_clave": ["maestria", "construccion"]
+  },
+  {
+    "id": "33",
+    "nombre": "Claustro Doctoral",
+    "descripcion": "Área de Maestros",
+    "tipo": "Administrativo",
+    "edificio_id": "33",
+    "coordenadas": [-96.74362826852097, 17.07903021994673],
+    "palabras_clave": ["claustro", "doctoral"]
+  },
+  {
+    "id": "36",
+    "nombre": "Dirección",
+    "descripcion": "Dirección General",
+    "tipo": "Administrativo",
+    "edificio_id": "36",
+    "coordenadas": [-96.74507077404066, 17.077500901183278],
+    "palabras_clave": ["direccion", "subdireccion", "planeacion"]
+  },
+  {
+    "id": "39",
+    "nombre": "Sala de Maestros",
+    "descripcion": "Ing. Gregorio Gutiérrez López",
+    "tipo": "Administrativo",
+    "edificio_id": "39",
+    "coordenadas": [-96.74410908253533, 17.07620929454427],
+    "palabras_clave": ["sala de maestros", "gregorio", "profesores"]
+  },
+  {
+    "id": "41",
+    "nombre": "Cubículos de Maestros C",
+    "descripcion": "Área Docente",
+    "tipo": "Administrativo",
+    "edificio_id": "41",
+    "coordenadas": [-96.74449965482916, 17.077607107490586],
+    "palabras_clave": ["cubiculos", "maestros c"]
+  },
+  {
+    "id": "43",
+    "nombre": "Orientación Educativa y Titulación",
+    "descripcion": "Acción Tutorial y Simulación Civil",
+    "tipo": "Administrativo",
+    "edificio_id": "43",
+    "coordenadas": [-96.74519884635241, 17.078238097904652],
+    "palabras_clave": ["titulacion", "orientacion", "tutorial"]
+  },
+  {
+    "id": "44",
+    "nombre": "Sección 61",
+    "descripcion": "Sindicato",
+    "tipo": "Administrativo",
+    "edificio_id": "44",
+    "coordenadas": [-96.74609170820065, 17.078587433356674],
+    "palabras_clave": ["seccion 61", "sindicato"]
+  },
+  {
+    "id": "49",
+    "nombre": "GRIQ",
+    "descripcion": "Área de Investigación",
+    "tipo": "Administrativo",
+    "edificio_id": "49",
+    "coordenadas": [-96.74406558860987, 17.079613703863053],
+    "palabras_clave": ["griq", "quimica"]
+  },
+  {
+    "id": "c-civil",
+    "nombre": "Cubículos Dept. Civil",
+    "descripcion": "Área Docente",
+    "tipo": "Administrativo",
+    "edificio_id": "20",
+    "coordenadas": [-96.7443035115631, 17.078735549505833],
+    "palabras_clave": ["cubiculos civil"]
+  },
+  {
+    "id": "gric",
+    "nombre": "GRIC",
+    "descripcion": "Área de Investigación",
+    "tipo": "Administrativo",
+    "edificio_id": "20",
+    "coordenadas": [-96.7443035115631, 17.078735549505833],
+    "palabras_clave": ["gric", "civil"]
+  },
+  {
+    "id": "30",
+    "nombre": "Audiovisual de Licenciatura",
+    "descripcion": "Sección 22",
+    "tipo": "Audiovisual",
+    "edificio_id": "30",
+    "coordenadas": [-96.744712588063, 17.076589817664626],
+    "palabras_clave": ["audilic", "auditorio", "seccion 22"]
+  },
+  {
+    "id": "31",
+    "nombre": "Audiovisual de Ingeniería",
+    "descripcion": "Sala de Proyecciones",
+    "tipo": "Audiovisual",
+    "edificio_id": "31",
+    "coordenadas": [-96.74579372384098, 17.078344382603287],
+    "palabras_clave": ["audiovisual", "proyecciones"]
+  },
+  {
+    "id": "40",
+    "nombre": "Centro de Información",
+    "descripcion": "Biblioteca",
+    "tipo": "Biblioteca",
+    "edificio_id": "40",
+    "coordenadas": [-96.7442550939818, 17.077561032695478],
+    "palabras_clave": ["biblioteca", "libros", "lectura", "cubiculos"]
+  },
+  {
+    "id": "47",
+    "nombre": "Cafetería",
+    "descripcion": "Alimentos y Bebidas",
+    "tipo": "Comida",
+    "edificio_id": "47",
+    "coordenadas": [-96.74403682440172, 17.07740250416327],
+    "palabras_clave": ["comida", "cafe", "comedor"]
+  },
+  {
+    "id": "48",
+    "nombre": "Gimnasio",
+    "descripcion": "Deportes",
+    "tipo": "Área Común",
+    "edificio_id": "48",
+    "coordenadas": [-96.74366627371916, 17.077469924343607],
+    "palabras_clave": ["deportes", "cancha", "gimnasio"]
+  },
+  {
+    "id": "musica",
+    "nombre": "Área de Música",
+    "descripcion": "Actividades Extraescolares",
+    "tipo": "Área Común",
+    "edificio_id": "19",
+    "coordenadas": [-96.7434344680411, 17.07793665941477],
+    "palabras_clave": ["musica", "extraescolares"]
+  },
+  {
+    "id": "p-juarez",
+    "nombre": "Plaza Benito Juárez",
+    "descripcion": "Explanada",
+    "tipo": "Punto de Interés",
+    "edificio_id": null,
+    "coordenadas": [-96.74472352106524, 17.07742280831027],
+    "palabras_clave": ["plaza", "explanada", "benito juarez"]
+  },
+  {
+    "id": "p-civica",
+    "nombre": "Plaza Cívica",
+    "descripcion": "Explanada Central",
+    "tipo": "Punto de Interés",
+    "edificio_id": null,
+    "coordenadas": [-96.74431743812549, 17.07719894207425],
+    "palabras_clave": ["plaza civica", "explanada"]
+  },
+  {
+    "id": "bancas",
+    "nombre": "Bancas y Áreas de Descanso",
+    "descripcion": "Puntos de Reunión",
+    "tipo": "Área Común",
+    "edificio_id": null,
+    "coordenadas": [-96.74433305670003, 17.078036097673085],
+    "palabras_clave": ["bancas", "descanso", "reunion"]
+  },
+  {
+    "id": "50",
+    "nombre": "Planta de Tratamiento",
+    "descripcion": "Servicios Hídricos",
+    "tipo": "Servicio",
+    "edificio_id": null,
+    "coordenadas": [-96.74513108245873, 17.078943669647675],
+    "palabras_clave": ["planta", "tratamiento", "agua"]
+  },
+  {
+    "id": "puri",
+    "nombre": "Purificadora",
+    "descripcion": "Agua Potable",
+    "tipo": "Servicio",
+    "edificio_id": "102",
+    "coordenadas": [-96.7448193149895, 17.077597736345844],
+    "palabras_clave": ["agua", "garrafones", "purificadora"]
+  },
+  {
+    "id": "medico",
+    "nombre": "Centro Médico",
+    "descripcion": "Enfermería / Primeros Auxilios",
+    "tipo": "Servicio",
+    "edificio_id": null,
+    "coordenadas": [-96.7450607486795, 17.077529448240988],
+    "palabras_clave": ["enfermeria", "doctor", "medico", "primeros auxilios"]
+  },
+  {
+    "id": "caldera",
+    "nombre": "Caldera",
+    "descripcion": "Servicios Generales",
+    "tipo": "Servicio",
+    "edificio_id": null,
+    "coordenadas": [-96.74366627371916, 17.077469924343607],
+    "palabras_clave": ["caldera", "servicios generales"]
+  },
+  {
+    "id": "bodega",
+    "nombre": "Bodega",
+    "descripcion": "Almacén",
+    "tipo": "Servicio",
+    "edificio_id": "21",
+    "coordenadas": [-96.74321268428166, 17.076858977766992],
+    "palabras_clave": ["almacen", "bodega"]
+  },
+  {
+    "id": "banos",
+    "nombre": "Baños",
+    "descripcion": "Sanitarios",
+    "tipo": "Baños",
+    "edificio_id": "101",
+    "coordenadas": [-96.74421435553309, 17.076292023508817],
+    "palabras_clave": ["sanitarios", "wc", "baños"]
+  }
+]

@@ -18,12 +18,32 @@
         </div>
       </div>
 
+      <!-- Resumen de distancia y tiempo cuando ya se trazó la ruta -->
+      <div v-if="ruta" class="resumen-ruta">
+        <div class="origen-fila">
+          <span class="origen-titulo">🚩 Saliendo desde:</span>
+          <span class="origen-nombre">{{ ruta.origenNombre }}</span>
+        </div>
+
+        <div class="metricas-fila">
+          <div class="metrica">
+            <span class="metrica-dato">{{ ruta.tiempoMinutos }} min</span>
+            <span class="metrica-sub">Tiempo aprox.</span>
+          </div>
+          <div class="divisor"></div>
+          <div class="metrica">
+            <span class="metrica-dato">{{ ruta.distancia }} m</span>
+            <span class="metrica-sub">Distancia</span>
+          </div>
+        </div>
+      </div>
+
       <div class="tarjeta-acciones">
         <button class="btn-ruta" @click="$emit('trazar-ruta', lugar)">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
             <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
           </svg>
-          Cómo llegar
+          {{ ruta ? 'Recalcular ruta' : 'Cómo llegar' }}
         </button>
       </div>
     </div>
@@ -35,6 +55,10 @@ import { computed } from 'vue';
 
 const props = defineProps({
   lugar: {
+    type: Object,
+    default: null
+  },
+  ruta: {
     type: Object,
     default: null
   }
@@ -59,12 +83,15 @@ const icono = computed(() => {
   position: absolute;
   bottom: 0;
   left: 0;
+  right: 0;
+  margin: 0 auto;
   width: 100%;
+  max-width: 520px;
   background: white;
   border-radius: 20px 20px 0 0;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   padding: 25px 20px 30px;
-  z-index: 20; /* Flota por encima de todo */
+  z-index: 20;
   box-sizing: border-box;
 }
 
@@ -92,7 +119,7 @@ const icono = computed(() => {
 .tarjeta-header {
   display: flex;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .icono-grande {
@@ -101,6 +128,7 @@ const icono = computed(() => {
   background: #f5f8fa;
   width: 70px;
   height: 70px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -110,11 +138,12 @@ const icono = computed(() => {
 .info-principal {
   display: flex;
   flex-direction: column;
+  padding-right: 25px;
 }
 
 .nombre {
   margin: 0 0 5px 0;
-  font-size: 22px;
+  font-size: 20px;
   color: #333;
 }
 
@@ -134,13 +163,71 @@ const icono = computed(() => {
   align-self: flex-start;
 }
 
+.resumen-ruta {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.origen-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 13px;
+  color: #475569;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.origen-titulo {
+  font-weight: 600;
+}
+
+.origen-nombre {
+  color: #1e293b;
+  font-weight: bold;
+}
+
+.metricas-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.metrica {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.metrica-dato {
+  font-size: 18px;
+  font-weight: bold;
+  color: #FF6D00;
+}
+
+.metrica-sub {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.divisor {
+  width: 1px;
+  height: 30px;
+  background: #cbd5e1;
+}
+
 .tarjeta-acciones {
   display: flex;
   justify-content: center;
 }
 
 .btn-ruta {
-  background: #1E88E5; /* Azul tecnológico */
+  background: #1E88E5;
   color: white;
   border: none;
   padding: 12px 24px;
@@ -162,7 +249,6 @@ const icono = computed(() => {
   transform: translateY(-2px);
 }
 
-/* Animaciones de entrada y salida */
 .slide-up-enter-active,
 .slide-up-leave-active {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
