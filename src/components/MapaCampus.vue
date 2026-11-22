@@ -2,7 +2,6 @@
   <div class="map-wrap">
     <div ref="mapContainer" class="map-container"></div>
 
-    <!-- Selector de punto de partida para probar cualquier entrada o usar GPS -->
     <div class="selector-origen">
       <label for="select-origen">🚩 Salir desde:</label>
       <select id="select-origen" v-model="origenSeleccionado">
@@ -28,12 +27,16 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+const emit = defineEmits(['seleccionar-edificio']);
+
 const mapContainer = ref(null);
 let map = null;
 
 const vistaSatelite = ref(false);
 const ubicacionUsuario = ref(null);
 const origenSeleccionado = ref('auto');
+const edificioActivoId = ref(null);
+const pisoActivo = ref('PB');
 
 const ACCESOS_CAMPUS = [
   {
@@ -92,6 +95,37 @@ const toggleVista = () => {
   vistaSatelite.value = !vistaSatelite.value;
   const visibilidad = vistaSatelite.value ? 'visible' : 'none';
   map.setLayoutProperty('capa-satelite', 'visibility', visibilidad);
+};
+
+const actualizarEstiloEdificios = () => {
+  if (!map || !map.getLayer('edificios-3d')) return;
+
+  const idSel = edificioActivoId.value ? String(edificioActivoId.value) : '';
+  const piso = pisoActivo.value;
+
+  let condicionNivel = true;
+  if (piso === 'P1') {
+    condicionNivel = [
+      'any',
+      ['>=', ['to-number', ['get', 'altura']], 8],
+      ['==', ['upcase', ['to-string', ['get', 'piso']]], 'P1']
+    ];
+  } else if (piso === 'P2') {
+    condicionNivel = [
+      'any',
+      ['>=', ['to-number', ['get', 'altura']], 12],
+      ['==', ['upcase', ['to-string', ['get', 'piso']]], 'P2']
+    ];
+  }
+
+  map.setPaintProperty('edificios-3d', 'fill-extrusion-color', [
+    'case',
+    ['==', ['to-string', ['get', 'id']], idSel],
+    '#F59E0B',
+    condicionNivel,
+    '#1E88E5',
+    '#CBD5E1'
+  ]);
 };
 
 onMounted(() => {
@@ -166,6 +200,26 @@ onMounted(() => {
     });
 
     map.addLayer({
+      id: 'edificios-etiquetas',
+      type: 'symbol',
+      source: 'edificios-ito',
+      minzoom: 16.8,
+      layout: {
+        'text-field': ['get', 'nombre'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 16.8, 11, 19, 14],
+        'text-max-width': 8,
+        'text-anchor': 'center',
+        'text-allow-overlap': false
+      },
+      paint: {
+        'text-color': '#1e293b',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 2,
+        'text-halo-blur': 0.5
+      }
+    });
+
+    map.addLayer({
       id: 'ruta-activa-borde',
       type: 'line',
       source: 'ruta-activa',
@@ -200,6 +254,25 @@ onMounted(() => {
         'circle-stroke-width': 2.5,
         'circle-stroke-color': '#FFFFFF'
       }
+    });
+
+    map.on('mouseenter', 'edificios-3d', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'edificios-3d', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+    map.on('click', 'edificios-3d', (e) => {
+      if (!e.features || !e.features.length) return;
+      const props = e.features[0].properties;
+
+      emit('seleccionar-edificio', {
+        edificioId: String(props.id),
+        nombre: props.nombre || 'Edificio',
+        coordenadas: [e.lngLat.lng, e.lngLat.lat]
+      });
     });
   });
 });
@@ -268,19 +341,13 @@ const volarACoordenada = (lng, lat) => {
 };
 
 const resaltarEdificio = (edificioId) => {
-  if (!map || !map.getLayer('edificios-3d')) return;
+  edificioActivoId.value = edificioId || null;
+  actualizarEstiloEdificios();
+};
 
-  if (!edificioId) {
-    map.setPaintProperty('edificios-3d', 'fill-extrusion-color', '#1E88E5');
-    return;
-  }
-
-  map.setPaintProperty('edificios-3d', 'fill-extrusion-color', [
-    'case',
-    ['==', ['to-string', ['get', 'id']], String(edificioId)],
-    '#F59E0B',
-    '#1E88E5'
-  ]);
+const cambiarNivelPiso = (piso) => {
+  pisoActivo.value = piso;
+  actualizarEstiloEdificios();
 };
 
 const dibujarRuta = (coordenadas) => {
@@ -336,6 +403,7 @@ const limpiarRuta = () => {
 defineExpose({
   volarACoordenada,
   resaltarEdificio,
+  cambiarNivelPiso,
   dibujarRuta,
   limpiarRuta,
   obtenerUbicacionOrigen

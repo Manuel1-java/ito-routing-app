@@ -7,7 +7,10 @@
       @cambio-accesibilidad="manejarAccesibilidad" 
     />
     
-    <MapaCampus ref="mapaRef" />
+    <MapaCampus 
+      ref="mapaRef" 
+      @seleccionar-edificio="manejarSeleccionEdificio"
+    />
 
     <TarjetaDestino 
       :lugar="lugarActivo" 
@@ -29,6 +32,7 @@ import { calcularRuta } from './utils/pathfinder'
 const lugarActivo = ref(null)
 const mapaRef = ref(null)
 const rutasGeojson = ref(null)
+const lugaresCatalogo = ref([])
 const rutaCalculada = ref(null)
 const navegando = ref(false)
 
@@ -37,10 +41,14 @@ const rutaAccesible = ref(false)
 
 onMounted(async () => {
   try {
-    const res = await fetch('/rutas.geojson')
-    rutasGeojson.value = await res.json()
+    const [resRutas, resLugares] = await Promise.all([
+      fetch('/rutas.geojson'),
+      fetch('/lugares.json')
+    ])
+    rutasGeojson.value = await resRutas.json()
+    lugaresCatalogo.value = await resLugares.json()
   } catch (error) {
-    console.error('Error al cargar rutas.geojson:', error)
+    console.error('Error al cargar archivos geográficos:', error)
   }
 })
 
@@ -57,6 +65,34 @@ const manejarSeleccion = (lugar) => {
       mapaRef.value.volarACoordenada(lugar.coordenadas[0], lugar.coordenadas[1])
     }
   }
+}
+
+const manejarSeleccionEdificio = ({ edificioId, nombre, coordenadas }) => {
+  const coincidencias = lugaresCatalogo.value.filter(
+    (l) => String(l.edificio_id) === String(edificioId)
+  )
+
+  let lugarEncontrado = null
+
+  if (coincidencias.length === 1) {
+    lugarEncontrado = coincidencias[0]
+  } else if (coincidencias.length > 1) {
+    const nombreBase = nombre.toLowerCase().slice(0, 8)
+    lugarEncontrado =
+      coincidencias.find((l) => l.nombre.toLowerCase().includes(nombreBase)) ||
+      coincidencias[0]
+  } else {
+    lugarEncontrado = {
+      id: `edificio-${edificioId}`,
+      nombre,
+      descripcion: 'Edificio del campus',
+      tipo: 'Edificio',
+      edificio_id: String(edificioId),
+      coordenadas
+    }
+  }
+
+  manejarSeleccion(lugarEncontrado)
 }
 
 const iniciarRuta = async (lugar) => {
@@ -83,7 +119,8 @@ const iniciarRuta = async (lugar) => {
   rutaCalculada.value = {
     ...resultado,
     origenNombre: origen.nombre,
-    desdeGPS: origen.esGPS
+    desdeGPS: origen.esGPS,
+    soloAccesible: rutaAccesible.value
   }
   navegando.value = true
   mapaRef.value.dibujarRuta(resultado.coordenadas)
@@ -98,6 +135,7 @@ const cerrarDestino = () => {
 
 const manejarCambioPiso = (piso) => {
   pisoActual.value = piso
+  mapaRef.value?.cambiarNivelPiso(piso)
 }
 
 const manejarAccesibilidad = (estado) => {

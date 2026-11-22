@@ -14,7 +14,10 @@
         <div class="info-principal">
           <h2 class="nombre">{{ lugar.nombre }}</h2>
           <p class="descripcion">{{ lugar.descripcion }}</p>
-          <span class="etiqueta-tipo">{{ lugar.tipo }}</span>
+          <div class="etiquetas-row">
+            <span class="etiqueta-tipo">{{ lugar.tipo }}</span>
+            <span v-if="ruta?.soloAccesible" class="etiqueta-accesible">♿ Sin escaleras</span>
+          </div>
         </div>
       </div>
 
@@ -153,6 +156,12 @@ const icono = computed(() => {
   color: #666;
 }
 
+.etiquetas-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .etiqueta-tipo {
   background: #e3f2fd;
   color: #1976d2;
@@ -160,7 +169,15 @@ const icono = computed(() => {
   border-radius: 12px;
   font-size: 12px;
   font-weight: bold;
-  align-self: flex-start;
+}
+
+.etiqueta-accesible {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
 }
 
 .resumen-ruta {
