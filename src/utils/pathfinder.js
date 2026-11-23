@@ -2,7 +2,7 @@ function claveNodo(coord) {
   return `${coord[0].toFixed(7)},${coord[1].toFixed(7)}`;
 }
 
-function distanciaMetros(coord1, coord2) {
+export function distanciaMetros(coord1, coord2) {
   const R = 6371000;
   const rad = Math.PI / 180;
   const lat1 = coord1[1] * rad;
@@ -15,6 +15,22 @@ function distanciaMetros(coord1, coord2) {
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Calcula el rumbo (azimut en grados 0° - 360°) de coord1 hacia coord2
+export function calcularRumbo(coord1, coord2) {
+  const rad = Math.PI / 180;
+  const deg = 180 / Math.PI;
+  const lat1 = coord1[1] * rad;
+  const lat2 = coord2[1] * rad;
+  const dLon = (coord2[0] - coord1[0]) * rad;
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+
+  return (Math.atan2(y, x) * deg + 360) % 360;
 }
 
 // Calcula el punto más cercano de un segmento AB a un punto P
@@ -44,7 +60,6 @@ function construirGrafo(rutasGeojson, soloAccesible = false) {
     return verticesUnicos.get(id);
   };
 
-  // 1. Extraer todos los segmentos válidos
   for (const feature of rutasGeojson.features) {
     if (feature.geometry?.type !== 'LineString') continue;
 
@@ -63,7 +78,6 @@ function construirGrafo(rutasGeojson, soloAccesible = false) {
     }
   }
 
-  // 2. Partir segmentos cuando un vértice (o extremo) toca a menos de 3.5m de otro tramo
   const UMBRAL_UNION_METROS = 3.5;
   const listaVertices = Array.from(verticesUnicos.values());
 
@@ -93,7 +107,6 @@ function construirGrafo(rutasGeojson, soloAccesible = false) {
     }
   }
 
-  // 3. Construir lista de adyacencia
   const grafo = {};
   const coordenadas = {};
 
@@ -119,7 +132,6 @@ function construirGrafo(rutasGeojson, soloAccesible = false) {
   return { grafo, coordenadas, segmentos: segmentosFinales, agregarArista };
 }
 
-// Conecta un punto externo (origen o destino) al punto más cercano sobre cualquier andador
 function conectarPuntoAlGrafo(coordObjetivo, grafoData) {
   let mejorProy = null;
   let mejorSeg = null;
@@ -145,7 +157,170 @@ function conectarPuntoAlGrafo(coordObjetivo, grafoData) {
   return idAnclaje;
 }
 
-export function calcularRuta(rutasGeojson, origenCoord, destinoCoord, soloAccesible = false) {
+// Convierte los vértices de la ruta en instrucciones paso a paso (recto, izquierda, derecha)
+export function generarInstrucciones(rutaCoords, nombreDestino = 'tu destino') {
+  if (!rutaCoords || rutaCoords.length < 2) return [];
+
+  // Filtrar micro-segmentos menores a 1.5 m para evitar falsos giros en las uniones
+  const puntos = [rutaCoords[0]];
+  for (let i = 1; i < rutaCoords.length; i++) {
+    const esUltimo = i === rutaCoords.length - 1;
+    if (esUltimo || distanciaMetros(puntos[puntos.length - 1], rutaCoords[i]) >= 1.5) {
+      puntos.push(rutaCoords[i]);
+    }
+  }
+
+  if (puntos.length < 2) return [];
+
+  const pasos = [];
+  let rumboPrevio = calcularRumbo(puntos[0], puntos[1]);
+  let pasoActual = {
+    tipo: 'recto',
+    texto: 'Avanza recto por el andador',
+    distancia: distanciaMetros(puntos[0], puntos[1]),
+    puntoGiro: puntos[0],
+    puntoSiguiente: puntos[1],
+    rumbo: rumboPrevio
+  };
+
+  for (let i = 1; i < puntos.length - 1; i++) {
+    const pActual = puntos[i];
+    const pSig = puntos[i + 1];
+    const distTramo = distanciaMetros(pActual, pSig);
+    const rumboNuevo = calcularRumbo(pActual, pSig);
+
+    // Diferencia angular entre -180° y +180°
+    const diff = ((rumboNuevo - rumboPrevio + 540) % 360) - 180;
+
+    if (Math.abs(diff) < 28) {
+      // Misma dirección general: acumulamos metros al paso actual
+      pasoActual.distancia += distTramo;
+      pasoActual.puntoSiguiente = pSig;
+    } else {
+      pasos.push({
+        ...pasoActual,
+        distancia: Math.max(1, Math.round(pasoActual.distancia))
+      });
+
+      let tipoGiro = 'derecha';
+      let textoGiro = 'Gira a la derecha';
+
+      if (Math.abs(diff) >= 135) {
+        tipoGiro = 'vuelta';
+        textoGiro = 'Da media vuelta';
+      } else if (diff < 0) {
+        tipoGiro = 'izquierda';
+        textoGiro = 'Gira a la izquierda';
+      }
+
+      pasoActual = {
+        tipo: tipoGiro,
+        texto: textoGiro,
+        distancia: distTramo,
+        puntoGiro: pActual,
+        puntoSiguiente: pSig,
+        rumbo: rumboNuevo
+      };
+    }
+
+    rumboPrevio = rumboNuevo;
+  }
+
+  pasos.push({
+    ...pasoActual,
+    distancia: Math.max(1, Math.round(pasoActual.distancia))
+  });
+
+  // Paso final de llegada
+  const puntoFinal = puntos[puntos.length - 1];
+  pasos.push({
+    tipo: 'destino',
+    texto: `Has llegado a ${nombreDestino}`,
+    distancia: 0,
+    puntoGiro: puntoFinal,
+    puntoSiguiente: puntoFinal,
+    rumbo: rumboPrevio
+  });
+
+  return pasos;
+}
+
+// Evalúa la posición GPS del usuario contra la ruta activa
+export function evaluarProgresoRuta(ubicacionActual, rutaCoords, pasos, pasoActualIdx) {
+  if (!ubicacionActual || !rutaCoords || rutaCoords.length < 2 || !pasos?.length) {
+    return null;
+  }
+
+  let menorDistRuta = Infinity;
+  let idxSegmentoCercano = 0;
+  let puntoProyectado = rutaCoords[0];
+
+  for (let i = 0; i < rutaCoords.length - 1; i++) {
+    const proy = proyectarEnSegmento(ubicacionActual, rutaCoords[i], rutaCoords[i + 1]);
+    if (proy.dist < menorDistRuta) {
+      menorDistRuta = proy.dist;
+      idxSegmentoCercano = i;
+      puntoProyectado = proy.punto;
+    }
+  }
+
+  // Si se aleja más de 22 m del andador, avisamos para recalcular
+  if (menorDistRuta > 22) {
+    return { fueraDeRuta: true };
+  }
+
+  const destino = rutaCoords[rutaCoords.length - 1];
+  const distAlDestino = distanciaMetros(ubicacionActual, destino);
+
+  if (distAlDestino <= 10) {
+    return {
+      llegado: true,
+      nuevoPasoIdx: pasos.length - 1,
+      distanciaAlSiguienteGiro: 0,
+      distanciaRestanteTotal: 0,
+      rumboActual: pasos[pasos.length - 1].rumbo
+    };
+  }
+
+  let nuevoPasoIdx = Math.min(pasoActualIdx, pasos.length - 2);
+  const siguientePaso = pasos[nuevoPasoIdx + 1];
+
+  if (siguientePaso) {
+    const distAlGiro = distanciaMetros(ubicacionActual, siguientePaso.puntoGiro);
+    // Si ya entró en el radio de 9 m de la esquina, avanza automáticamente
+    if (distAlGiro <= 9 && nuevoPasoIdx + 1 < pasos.length - 1) {
+      nuevoPasoIdx += 1;
+    }
+  }
+
+  const pasoRefSiguiente = pasos[nuevoPasoIdx + 1];
+  const distanciaAlSiguienteGiro = pasoRefSiguiente
+    ? Math.max(1, Math.round(distanciaMetros(ubicacionActual, pasoRefSiguiente.puntoGiro)))
+    : Math.max(1, Math.round(distAlDestino));
+
+  // Distancia restante sumando desde la proyección actual hasta el final
+  let restante = distanciaMetros(puntoProyectado, rutaCoords[idxSegmentoCercano + 1]);
+  for (let i = idxSegmentoCercano + 1; i < rutaCoords.length - 1; i++) {
+    restante += distanciaMetros(rutaCoords[i], rutaCoords[i + 1]);
+  }
+
+  return {
+    fueraDeRuta: false,
+    llegado: false,
+    nuevoPasoIdx,
+    distanciaAlSiguienteGiro,
+    distanciaRestanteTotal: Math.max(1, Math.round(restante)),
+    rumboActual: pasos[nuevoPasoIdx]?.rumbo || 0
+  };
+}
+
+export function calcularRuta(
+  rutasGeojson,
+  origenCoord,
+  destinoCoord,
+  soloAccesible = false,
+  nombreDestino = 'tu destino'
+) {
   const grafoData = construirGrafo(rutasGeojson, soloAccesible);
 
   const inicio = conectarPuntoAlGrafo(origenCoord, grafoData);
@@ -200,11 +375,13 @@ export function calcularRuta(rutasGeojson, origenCoord, destinoCoord, soloAccesi
 
   const distanciaTotal = Math.round(distancias[fin]);
   const tiempoMinutos = Math.max(1, Math.round(distanciaTotal / 75));
+  const pasos = generarInstrucciones(rutaCoords, nombreDestino);
 
   return {
     coordenadas: rutaCoords,
     distancia: distanciaTotal,
-    tiempoMinutos
+    tiempoMinutos,
+    pasos
   };
 }
 
