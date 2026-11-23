@@ -1,10 +1,10 @@
 <template>
   <div class="controles-laterales-container">
-    <!-- Botón de Accesibilidad (Ruta en silla de ruedas) -->
+    <!-- Botón de Accesibilidad (Ruta sin escaleras) -->
     <div class="accesibilidad-wrapper">
       <transition name="fade">
         <span v-if="mostrarAvisoAccesible" class="aviso-accesible">
-          {{ modoAccesible ? '♿ Ruta sin escaleras' : 'Ruta estándar' }}
+          {{ modoAccesible ? 'Ruta sin escaleras' : 'Ruta estándar' }}
         </span>
       </transition>
 
@@ -15,22 +15,7 @@
           @click="toggleAccesibilidad"
           title="Ruta sin escaleras"
         >
-          <svg
-            class="icono-svg"
-            viewBox="0 0 24 24"
-            width="24"
-            height="24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="10" cy="4.5" r="2" fill="currentColor" stroke="none" />
-            <path d="M10 8.5v5.5h5.5l2.5 5" />
-            <path d="M10 11h4.5" />
-            <path d="M13.5 16.5a4.5 4.5 0 1 1-4.2-6" />
-          </svg>
+          <Accessibility :size="22" />
         </button>
       </div>
     </div>
@@ -53,6 +38,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { Accessibility } from 'lucide-vue-next';
 
 const emit = defineEmits(['cambio-piso', 'cambio-accesibilidad']);
 
@@ -87,13 +73,13 @@ const cambiarPiso = (idPiso) => {
 <style scoped>
 .controles-laterales-container {
   position: absolute;
-  right: 15px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 20px;
+  gap: 16px;
   z-index: 10;
 }
 
@@ -126,9 +112,9 @@ const cambiarPiso = (idPiso) => {
 .btn-circular {
   border: none;
   background: white;
-  color: #64748b;
-  width: 45px;
-  height: 45px;
+  color: #475569;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -140,10 +126,6 @@ const cambiarPiso = (idPiso) => {
   background: #f8fafc;
 }
 
-.icono-svg {
-  transition: transform 0.2s ease;
-}
-
 .accesibilidad-activa {
   background: #059669;
   color: #ffffff;
@@ -153,20 +135,16 @@ const cambiarPiso = (idPiso) => {
   background: #047857;
 }
 
-.accesibilidad-activa .icono-svg {
-  transform: scale(1.08);
-}
-
 .btn-piso {
   border: none;
   background: white;
-  width: 45px;
-  height: 45px;
-  font-size: 14px;
+  width: 44px;
+  height: 42px;
+  font-size: 13px;
   font-weight: bold;
-  color: #555;
+  color: #475569;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f1f5f9;
   transition: all 0.2s ease;
 }
 
@@ -175,7 +153,7 @@ const cambiarPiso = (idPiso) => {
 }
 
 .btn-piso:hover {
-  background: #f5f8fa;
+  background: #f8fafc;
 }
 
 .piso-activo {
@@ -192,5 +170,25 @@ const cambiarPiso = (idPiso) => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* En móvil se posiciona debajo de los controles de zoom/GPS de MapLibre */
+@media (max-width: 768px) {
+  .controles-laterales-container {
+    top: 268px;
+    transform: none;
+    gap: 12px;
+  }
+
+  .btn-circular {
+    width: 40px;
+    height: 40px;
+  }
+
+  .btn-piso {
+    width: 40px;
+    height: 36px;
+    font-size: 12px;
+  }
 }
 </style>
