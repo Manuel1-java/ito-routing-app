@@ -13,6 +13,17 @@
         placeholder="Buscar salón, edificio o área..." 
         class="search-input"
       />
+
+      <button
+        type="button"
+        class="btn-cuenta"
+        :class="{ autenticado: Boolean(usuarioActual) }"
+        :title="usuarioActual ? `${usuarioActual.nombre} (${usuarioActual.rol})` : 'Acceso / Roles'"
+        @click="$emit('abrir-panel-roles')"
+      >
+        <User :size="17" />
+        <span v-if="usuarioActual" class="rol-corto">{{ usuarioActual.rol.slice(0, 3) }}</span>
+      </button>
     </div>
 
     <div class="filtros-rapidos">
@@ -58,9 +69,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import {
   Search,
+  User,
   Building2,
   BookOpen,
   FlaskConical,
@@ -75,21 +87,32 @@ import {
   Wrench
 } from 'lucide-vue-next';
 import { buscarLugares } from '../utils/pathfinder';
+import { usuarioActual } from '../services/api.js';
+import { obtenerDatosCampus, suscribirActualizacionCampus } from '../services/campusSync.js';
 
-const emit = defineEmits(['seleccion']);
+const emit = defineEmits(['seleccion', 'abrir-panel-roles']);
 
 const busqueda = ref('');
 const inputEnFoco = ref(false);
 const inputRef = ref(null);
 const lugaresITO = ref([]);
+let cancelarSuscripcion = null;
 
 onMounted(async () => {
   try {
-    const res = await fetch('/lugares.json');
-    lugaresITO.value = await res.json();
+    const datos = await obtenerDatosCampus();
+    lugaresITO.value = datos.lugares || [];
+
+    cancelarSuscripcion = suscribirActualizacionCampus((nuevosDatos) => {
+      lugaresITO.value = nuevosDatos.lugares || [];
+    });
   } catch (error) {
-    console.error('Error al cargar lugares.json:', error);
+    console.error('Error al cargar catalogo de lugares:', error);
   }
+});
+
+onUnmounted(() => {
+  if (cancelarSuscripcion) cancelarSuscripcion();
 });
 
 const resultadosFiltrados = computed(() => {
@@ -153,7 +176,7 @@ const ocultarResultados = () => {
   display: flex;
   align-items: center;
   background-color: white;
-  padding: 11px 16px;
+  padding: 8px 10px 8px 16px;
   border-radius: 25px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   transition: box-shadow 0.3s ease;
@@ -182,6 +205,31 @@ const ocultarResultados = () => {
 
 .search-input::placeholder {
   color: #94a3b8;
+}
+
+.btn-cuenta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  border-radius: 18px;
+  padding: 7px 10px;
+  margin-left: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.btn-cuenta.autenticado {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.rol-corto {
+  letter-spacing: 0.3px;
 }
 
 .filtros-rapidos {

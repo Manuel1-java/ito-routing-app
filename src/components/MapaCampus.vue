@@ -2,6 +2,10 @@
   <div class="map-wrap" :class="{ 'con-tarjeta-abierta': tarjetaAbierta }">
     <div ref="mapContainer" class="map-container"></div>
 
+    <div v-if="errorMapa" class="error-mapa">
+      {{ errorMapa }}
+    </div>
+
     <div v-if="!guiando" class="selector-origen">
       <MapPin class="icono-origen" :size="16" />
       <label for="select-origen">Salir desde:</label>
@@ -25,12 +29,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapPin, Map as MapIcon, Globe } from 'lucide-vue-next';
+import { obtenerDatosCampus } from '../services/campusSync.js';
 
-defineProps({
+if (import.meta.env.PROD && typeof maplibregl.setWorkerUrl === 'function') {
+  maplibregl.setWorkerUrl('/maplibre-worker.js');
+}
+
+const props = defineProps({
   tarjetaAbierta: {
     type: Boolean,
     default: false
@@ -38,14 +47,29 @@ defineProps({
   guiando: {
     type: Boolean,
     default: false
+  },
+  seleccionandoTramo: {
+    type: Boolean,
+    default: false
+  },
+  tramoSeleccionadoId: {
+    type: [Number, String],
+    default: null
   }
 });
 
-const emit = defineEmits(['seleccionar-edificio', 'actualizacion-gps']);
+const emit = defineEmits([
+  'seleccionar-edificio',
+  'actualizacion-gps',
+  'clic-mapa',
+  'seleccionar-tramo'
+]);
 
 const mapContainer = ref(null);
+const errorMapa = ref('');
 let map = null;
 let watchId = null;
+let resizeObserver = null;
 
 const vistaSatelite = ref(false);
 const ubicacionUsuario = ref(null);
@@ -124,6 +148,32 @@ const toggleVista = () => {
   }
 };
 
+const actualizarCapaTramosEdicion = () => {
+  if (!map || !map.getLayer('rutas-campus-linea')) return;
+
+  const visibilidad = props.seleccionandoTramo ? 'visible' : 'none';
+  map.setLayoutProperty('rutas-campus-linea', 'visibility', visibilidad);
+  map.setLayoutProperty('rutas-campus-hitbox', 'visibility', visibilidad);
+
+  const idSel = props.tramoSeleccionadoId !== null ? String(props.tramoSeleccionadoId) : '';
+
+  map.setPaintProperty('rutas-campus-linea', 'line-color', [
+    'case',
+    ['==', ['to-string', ['coalesce', ['get', 'id'], ['id']]], idSel],
+    '#F59E0B',
+    ['==', ['get', 'habilitado'], false],
+    '#EF4444',
+    '#10B981'
+  ]);
+};
+
+watch(
+  () => [props.seleccionandoTramo, props.tramoSeleccionadoId],
+  () => {
+    actualizarCapaTramosEdicion();
+  }
+);
+
 const actualizarEstiloEdificios = () => {
   if (!map || !map.getLayer('edificios-3d')) return;
 
@@ -184,16 +234,48 @@ onMounted(() => {
     [-96.736851, 17.081369]
   ];
 
-  map = new maplibregl.Map({
-    container: mapContainer.value,
-    style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-    center: [-96.744388, 17.077856],
-    zoom: 16.5,
-    minZoom: 15.5,
-    maxZoom: ZOOM_MAX_NORMAL,
-    maxBounds: limitesITO,
-    pitch: 0,
-    bearing: 0
+  try {
+    map = new maplibregl.Map({
+      container: mapContainer.value,
+      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      center: [-96.744388, 17.077856],
+      zoom: 16.5,
+      minZoom: 15.5,
+      maxZoom: ZOOM_MAX_NORMAL,
+      maxBounds: limitesITO,
+      pitch: 0,
+      bearing: 0,
+      canvasContextAttributes: {
+        preserveDrawingBuffer: true,
+        antialias: false,
+        failIfMajorPerformanceCaveat: false
+      }
+    });
+  } catch (err) {
+    errorMapa.value = `Error iniciando WebGL: ${err.message}`;
+    return;
+  }
+
+  map.getCanvas()?.addEventListener('webglcontextcreationerror', (e) => {
+    errorMapa.value = `WebGL no disponible: ${e.statusMessage || 'sin soporte'}`;
+  });
+
+  resizeObserver = new ResizeObserver(() => {
+    if (map) map.resize();
+  });
+  if (mapContainer.value) {
+    resizeObserver.observe(mapContainer.value);
+  }
+  setTimeout(() => {
+    if (map) map.resize();
+  }, 300);
+
+  map.on('error', (e) => {
+    const msg = e?.error?.message || '';
+    console.error('Error MapLibre:', e?.error || e);
+    if (msg && !msg.includes('Failed to fetch')) {
+      errorMapa.value = `Aviso mapa: ${msg}`;
+    }
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -210,7 +292,11 @@ onMounted(() => {
   
   map.addControl(geolocateControl, 'top-right');
 
-  map.on('load', () => {
+  map.on('load', async () => {
+    map.resize();
+
+    const datosCampus = await obtenerDatosCampus();
+
     map.addSource('fuente-satelite', {
       type: 'raster',
       tiles: [
@@ -222,7 +308,12 @@ onMounted(() => {
 
     map.addSource('edificios-ito', {
       type: 'geojson',
-      data: '/edificios.geojson'
+      data: datosCampus.edificios || '/edificios.geojson'
+    });
+
+    map.addSource('rutas-campus', {
+      type: 'geojson',
+      data: datosCampus.rutas || '/rutas.geojson'
     });
 
     map.addSource('ruta-activa', {
@@ -275,6 +366,43 @@ onMounted(() => {
     });
 
     map.addLayer({
+      id: 'rutas-campus-linea',
+      type: 'line',
+      source: 'rutas-campus',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round',
+        visibility: props.seleccionandoTramo ? 'visible' : 'none'
+      },
+      paint: {
+        'line-color': [
+          'case',
+          ['==', ['get', 'habilitado'], false],
+          '#EF4444',
+          '#10B981'
+        ],
+        'line-width': 5,
+        'line-opacity': 0.9
+      }
+    });
+
+    map.addLayer({
+      id: 'rutas-campus-hitbox',
+      type: 'line',
+      source: 'rutas-campus',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round',
+        visibility: props.seleccionandoTramo ? 'visible' : 'none'
+      },
+      paint: {
+        'line-color': '#000000',
+        'line-width': 22,
+        'line-opacity': 0.01
+      }
+    });
+
+    map.addLayer({
       id: 'ruta-activa-borde',
       type: 'line',
       source: 'ruta-activa',
@@ -311,7 +439,6 @@ onMounted(() => {
       }
     });
 
-    // Marcador GPS en vivo durante la navegación
     map.addLayer({
       id: 'usuario-vivo-halo',
       type: 'circle',
@@ -335,6 +462,28 @@ onMounted(() => {
       }
     });
 
+    map.on('mouseenter', 'rutas-campus-hitbox', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'rutas-campus-hitbox', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+    map.on('click', 'rutas-campus-hitbox', (e) => {
+      if (!props.seleccionandoTramo || !e.features || !e.features.length) return;
+      const feat = e.features[0];
+      const fProps = feat.properties || {};
+      const idTramo = fProps.id ?? feat.id;
+
+      emit('seleccionar-tramo', {
+        id: Number(idTramo) || idTramo,
+        habilitado: fProps.habilitado !== false,
+        tipo: fProps.tipo || 'andador',
+        accesible: fProps.accesible !== false
+      });
+    });
+
     map.on('mouseenter', 'edificios-3d', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
@@ -343,23 +492,49 @@ onMounted(() => {
       map.getCanvas().style.cursor = '';
     });
 
+    map.on('click', (e) => {
+      emit('clic-mapa', [e.lngLat.lng, e.lngLat.lat]);
+    });
+
     map.on('click', 'edificios-3d', (e) => {
       if (!e.features || !e.features.length) return;
-      const props = e.features[0].properties;
+      const fProps = e.features[0].properties;
 
       emit('seleccionar-edificio', {
-        edificioId: String(props.id),
-        nombre: props.nombre || 'Edificio',
+        edificioId: String(fProps.id),
+        nombre: fProps.nombre || 'Edificio',
         coordenadas: [e.lngLat.lng, e.lngLat.lat]
       });
     });
+
+    actualizarCapaTramosEdicion();
   });
 });
 
 onUnmounted(() => {
   detenerSeguimientoVivo();
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
   if (map) map.remove();
 });
+
+const actualizarEdificios = (geojson) => {
+  if (!map || !geojson) return;
+  const fuente = map.getSource('edificios-ito');
+  if (fuente) {
+    fuente.setData(geojson);
+  }
+};
+
+const actualizarRutas = (geojson) => {
+  if (!map || !geojson) return;
+  const fuente = map.getSource('rutas-campus');
+  if (fuente) {
+    fuente.setData(geojson);
+  }
+};
 
 const obtenerUbicacionOrigen = () => {
   if (origenSeleccionado.value !== 'auto') {
@@ -542,20 +717,41 @@ defineExpose({
   cambiarNivelPiso,
   dibujarRuta,
   limpiarRuta,
-  obtenerUbicacionOrigen
+  obtenerUbicacionOrigen,
+  actualizarEdificios,
+  actualizarRutas
 });
 </script>
 
 <style scoped>
 .map-wrap {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 .map-container {
   position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.error-mapa {
+  position: absolute;
+  top: 130px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 12px;
+  z-index: 30;
+  max-width: 85vw;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 :deep(.maplibregl-ctrl-top-right) {
@@ -658,7 +854,6 @@ defineExpose({
     font-size: 12px;
   }
 
-  /* Evita encime con la tarjeta inferior en móviles */
   .con-tarjeta-abierta .selector-origen,
   .con-tarjeta-abierta .btn-vista {
     opacity: 0;

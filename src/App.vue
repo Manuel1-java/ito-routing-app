@@ -1,6 +1,20 @@
 <template>
   <div class="app-wrapper">
-    <BuscadorSalones v-if="!guiando" @seleccion="manejarSeleccion" />
+    <div v-if="esperandoClicMapa || esperandoTramoMapa" class="banner-captura">
+      <span v-if="esperandoTramoMapa">
+        Toca un pasillo en el mapa (Verde: abierto, Rojo: cerrado)
+      </span>
+      <span v-else>
+        Toca cualquier punto en el mapa para capturar sus coordenadas
+      </span>
+      <button type="button" @click="cancelarCapturaMapa">Cancelar</button>
+    </div>
+
+    <BuscadorSalones
+      v-else-if="!guiando"
+      @seleccion="manejarSeleccion"
+      @abrir-panel-roles="panelRolesAbierto = true"
+    />
 
     <BannerNavegacion
       v-else
@@ -22,8 +36,12 @@
       ref="mapaRef"
       :tarjeta-abierta="Boolean(lugarActivo)"
       :guiando="guiando"
+      :seleccionando-tramo="esperandoTramoMapa"
+      :tramo-seleccionado-id="tramoCapturado?.id ?? null"
       @seleccionar-edificio="manejarSeleccionEdificio"
       @actualizacion-gps="manejarActualizacionGPS"
+      @clic-mapa="manejarClicMapa"
+      @seleccionar-tramo="manejarSeleccionTramo"
     />
 
     <TarjetaDestino 
@@ -35,17 +53,31 @@
       @iniciar-guia="iniciarGuia"
       @detener-guia="detenerGuia"
     />
+
+    <PanelRoles
+      :abierto="panelRolesAbierto"
+      :coordenadas-capturadas="coordenadasCapturadas"
+      :esperando-clic-mapa="esperandoClicMapa"
+      :tramo-capturado="tramoCapturado"
+      :esperando-tramo-mapa="esperandoTramoMapa"
+      @cerrar="cerrarPanelRoles"
+      @activar-captura-mapa="activarCapturaCoordenadas"
+      @activar-captura-tramo="activarCapturaTramo"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import MapaCampus from './components/MapaCampus.vue'
 import BuscadorSalones from './components/BuscadorSalones.vue'
 import BannerNavegacion from './components/BannerNavegacion.vue'
 import TarjetaDestino from './components/TarjetaDestino.vue'
 import ControlesLaterales from './components/ControlesLaterales.vue'
+import PanelRoles from './components/PanelRoles.vue'
 import { calcularRuta, evaluarProgresoRuta } from './utils/pathfinder'
+import { obtenerDatosCampus, suscribirActualizacionCampus } from './services/campusSync'
+import { validarSesionActiva } from './services/api'
 
 const lugarActivo = ref(null)
 const mapaRef = ref(null)
@@ -62,23 +94,84 @@ const distanciaRestante = ref(0)
 const pisoActual = ref('PB')
 const rutaAccesible = ref(false)
 
+const panelRolesAbierto = ref(false)
+const esperandoClicMapa = ref(false)
+const coordenadasCapturadas = ref(null)
+const esperandoTramoMapa = ref(false)
+const tramoCapturado = ref(null)
+let cancelarSuscripcion = null
+
 onMounted(async () => {
+  validarSesionActiva()
+
   try {
-    const [resRutas, resLugares] = await Promise.all([
-      fetch('/rutas.geojson'),
-      fetch('/lugares.json')
-    ])
-    rutasGeojson.value = await resRutas.json()
-    lugaresCatalogo.value = await resLugares.json()
+    const datos = await obtenerDatosCampus()
+    rutasGeojson.value = datos.rutas
+    lugaresCatalogo.value = datos.lugares
+
+    cancelarSuscripcion = suscribirActualizacionCampus((nuevosDatos) => {
+      rutasGeojson.value = nuevosDatos.rutas
+      lugaresCatalogo.value = nuevosDatos.lugares
+      mapaRef.value?.actualizarEdificios(nuevosDatos.edificios)
+      mapaRef.value?.actualizarRutas(nuevosDatos.rutas)
+
+      if (navegando.value && lugarActivo.value) {
+        iniciarRuta(lugarActivo.value)
+      }
+    })
   } catch (error) {
-    console.error('Error al cargar archivos geográficos:', error)
+    console.error('Error al cargar datos del campus:', error)
   }
 })
+
+onUnmounted(() => {
+  if (cancelarSuscripcion) cancelarSuscripcion()
+})
+
+const activarCapturaCoordenadas = () => {
+  esperandoTramoMapa.value = false
+  esperandoClicMapa.value = true
+  panelRolesAbierto.value = false
+}
+
+const activarCapturaTramo = () => {
+  esperandoClicMapa.value = false
+  esperandoTramoMapa.value = true
+  panelRolesAbierto.value = false
+}
+
+const cancelarCapturaMapa = () => {
+  esperandoClicMapa.value = false
+  esperandoTramoMapa.value = false
+  panelRolesAbierto.value = true
+}
+
+const cerrarPanelRoles = () => {
+  panelRolesAbierto.value = false
+  esperandoClicMapa.value = false
+  esperandoTramoMapa.value = false
+}
+
+const manejarClicMapa = (coords) => {
+  if (!esperandoClicMapa.value) return
+  esperandoClicMapa.value = false
+  coordenadasCapturadas.value = coords
+  panelRolesAbierto.value = true
+}
+
+const manejarSeleccionTramo = (tramo) => {
+  if (!esperandoTramoMapa.value) return
+  esperandoTramoMapa.value = false
+  tramoCapturado.value = { ...tramo, _ts: Date.now() }
+  panelRolesAbierto.value = true
+}
 
 const normalizar = (txt) =>
   (txt || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
 const manejarSeleccion = (lugar) => {
+  if (esperandoClicMapa.value || esperandoTramoMapa.value) return
+
   detenerGuia()
   lugarActivo.value = lugar
   rutaCalculada.value = null
@@ -95,6 +188,8 @@ const manejarSeleccion = (lugar) => {
 }
 
 const manejarSeleccionEdificio = ({ edificioId, nombre, coordenadas }) => {
+  if (esperandoClicMapa.value || esperandoTramoMapa.value) return
+
   const coincidencias = lugaresCatalogo.value.filter(
     (l) => String(l.edificio_id) === String(edificioId)
   )
@@ -126,8 +221,8 @@ const iniciarRuta = async (lugar, origenPersonalizado = null, ajustarCamara = tr
   if (!lugar?.coordenadas || !mapaRef.value) return false
 
   if (!rutasGeojson.value) {
-    const res = await fetch('/rutas.geojson')
-    rutasGeojson.value = await res.json()
+    const datos = await obtenerDatosCampus()
+    rutasGeojson.value = datos.rutas
   }
 
   const origen = origenPersonalizado || mapaRef.value.obtenerUbicacionOrigen()
@@ -267,5 +362,38 @@ html, body {
   position: relative;
   width: 100vw;
   height: 100vh;
+}
+
+.banner-captura {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92%;
+  max-width: 440px;
+  background: #1e293b;
+  color: #ffffff;
+  padding: 11px 16px;
+  border-radius: 18px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.banner-captura button {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 </style>
