@@ -29,7 +29,6 @@
         {{ mensajeFeedback }}
       </div>
 
-      <!-- VISTA SIN SESION: LOGIN Y REGISTRO -->
       <div v-if="!usuarioActual" class="seccion-auth">
         <div class="tabs-auth">
           <button
@@ -98,7 +97,6 @@
         </div>
       </div>
 
-      <!-- VISTA AUTENTICADA -->
       <div v-else class="seccion-panel">
         <div class="perfil-bar">
           <div>
@@ -138,7 +136,6 @@
           </button>
         </div>
 
-        <!-- TAB 1: REPORTAR INCIDENCIA (ESTUDIANTE / MODERADOR / ADMIN) -->
         <form v-if="tabActiva === 'reportar'" @submit.prevent="enviarReporte" class="formulario">
           <p class="ayuda-txt">
             Reporta un andador cerrado por obras o mantenimiento para que un moderador actualice las rutas.
@@ -177,7 +174,6 @@
           </button>
         </form>
 
-        <!-- TAB 2: MODERACION DE TRAMOS Y REPORTES (MODERADOR / ADMIN) -->
         <div v-if="tabActiva === 'moderar' && esModeradorOAdmin" class="bloque-scroll">
           <form @submit.prevent="cambiarEstadoTramo" class="formulario caja-borde">
             <strong>Habilitar o cerrar tramo de ruta</strong>
@@ -223,15 +219,52 @@
             <div v-for="rep in reportes" :key="rep.id" class="item-reporte">
               <div class="rep-top">
                 <span>Tramo #{{ rep.tramo_id }}</span>
-                <span class="rep-estado">{{ rep.estado }}</span>
+                <span
+                  class="rep-estado"
+                  :class="rep.estado === 'resuelto' || (rep.estado === 'aprobado' && rep.tramo_habilitado) ? 'resuelto' : rep.estado"
+                >
+                  {{ rep.estado === 'resuelto' || (rep.estado === 'aprobado' && rep.tramo_habilitado) ? 'Rehabilitado' : rep.estado }}
+                </span>
               </div>
               <p>{{ rep.motivo }}</p>
               <small>Por: {{ rep.reportado_por }}</small>
+
+              <div
+                v-if="rep.estado === 'resuelto' || (rep.estado === 'aprobado' && rep.tramo_habilitado)"
+                class="rep-aviso-activo"
+              >
+                Este tramo ya se volvio a habilitar en el mapa.
+              </div>
+
+              <div
+                v-else-if="rep.estado === 'aprobado'"
+                class="rep-aviso-cerrado"
+              >
+                Este tramo sigue deshabilitado en el mapa.
+              </div>
+
+              <div v-if="rep.estado === 'pendiente'" class="rep-acciones">
+                <button
+                  type="button"
+                  class="btn-aprobar"
+                  :disabled="cargando"
+                  @click="procesarReporte(rep.id, 'aprobado')"
+                >
+                  Aprobar y cerrar tramo
+                </button>
+                <button
+                  type="button"
+                  class="btn-rechazar"
+                  :disabled="cargando"
+                  @click="procesarReporte(rep.id, 'rechazado')"
+                >
+                  Rechazar
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- TAB 3: ADMINISTRACION DE LUGARES Y EDIFICIOS (SOLO ADMIN) -->
         <div v-if="tabActiva === 'admin' && esAdmin" class="bloque-scroll">
           <form @submit.prevent="crearNuevoLugar" class="formulario caja-borde">
             <strong>Agregar nuevo salon o punto de interes</strong>
@@ -497,6 +530,26 @@ const cargarReportes = async () => {
   }
 };
 
+const procesarReporte = async (reporteId, estado) => {
+  cargando.value = true;
+  limpiarFeedback();
+  try {
+    const res = await apiFetch(`/campus/reportes/${reporteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estado })
+    });
+    if (estado === 'aprobado') {
+      await sincronizarConServidor(versionCampusLocal.value);
+    }
+    await cargarReportes();
+    mostrarFeedback(res.mensaje, 'exito');
+  } catch (err) {
+    mostrarFeedback(err.message, 'error');
+  } finally {
+    cargando.value = false;
+  }
+};
+
 const cambiarEstadoTramo = async () => {
   cargando.value = true;
   limpiarFeedback();
@@ -506,6 +559,7 @@ const cambiarEstadoTramo = async () => {
       body: JSON.stringify({ habilitado: formTramo.value.habilitado })
     });
     await sincronizarConServidor(versionCampusLocal.value);
+    await cargarReportes();
     mostrarFeedback(res.mensaje, 'exito');
   } catch (err) {
     mostrarFeedback(err.message, 'error');
@@ -913,6 +967,39 @@ textarea:focus {
 
 .rep-estado {
   color: #d97706;
+  text-transform: capitalize;
+}
+
+.rep-estado.aprobado {
+  color: #16a34a;
+}
+
+.rep-estado.rechazado {
+  color: #dc2626;
+}
+
+.rep-estado.resuelto {
+  color: #0284c7;
+}
+
+.rep-aviso-activo {
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rep-aviso-cerrado {
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .item-reporte p {
@@ -924,6 +1011,38 @@ textarea:focus {
 .item-reporte small {
   color: #64748b;
   font-size: 11px;
+}
+
+.rep-acciones {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.btn-aprobar,
+.btn-rechazar {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-aprobar {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.btn-rechazar {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.btn-aprobar:disabled,
+.btn-rechazar:disabled {
+  opacity: 0.6;
 }
 
 .vacio-txt {

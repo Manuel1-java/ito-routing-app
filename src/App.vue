@@ -136,6 +136,7 @@ const activarCapturaCoordenadas = () => {
 
 const activarCapturaTramo = () => {
   esperandoClicMapa.value = false
+  tramoCapturado.value = null
   esperandoTramoMapa.value = true
   panelRolesAbierto.value = false
 }
@@ -225,9 +226,16 @@ const iniciarRuta = async (lugar, origenPersonalizado = null, ajustarCamara = tr
     rutasGeojson.value = datos.rutas
   }
 
+  const rutasHabilitadas = {
+    ...rutasGeojson.value,
+    features: (rutasGeojson.value?.features || []).filter(
+      (f) => f.properties?.habilitado !== false
+    )
+  }
+
   const origen = origenPersonalizado || mapaRef.value.obtenerUbicacionOrigen()
   const resultado = calcularRuta(
-    rutasGeojson.value,
+    rutasHabilitadas,
     origen.coords,
     lugar.coordenadas,
     rutaAccesible.value,

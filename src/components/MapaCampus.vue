@@ -94,11 +94,11 @@ const ACCESOS_CAMPUS = [
     coords: [-96.74475163449951, 17.075831796177102]
   },
   {
-    nombre: 'Acceso Juan de Dios Bátiz / Ferrocarril',
+    nombre: 'Acceso Av. Ferrocarril (Sur / Bátiz)',
     coords: [-96.74320435437524, 17.076342002947552]
   },
   {
-    nombre: 'Acceso Calzada Madero / Ferrocarril',
+    nombre: 'Acceso Calzada Madero (Posgrado)',
     coords: [-96.74339672315243, 17.079301983144862]
   }
 ];
@@ -226,6 +226,25 @@ const actualizarMarcadorUsuario = (coords) => {
   });
 };
 
+const normalizarRutasGeojson = (geojson) => {
+  if (!geojson || !Array.isArray(geojson.features)) return geojson;
+  return {
+    ...geojson,
+    features: geojson.features.map((f, idx) => {
+      const fProps = f.properties || {};
+      const idResuelto = fProps.id ?? fProps.ID ?? fProps.fid ?? fProps.FID ?? f.id ?? (idx + 1);
+      return {
+        ...f,
+        id: idResuelto,
+        properties: {
+          ...fProps,
+          id: idResuelto
+        }
+      };
+    })
+  };
+};
+
 onMounted(() => {
   solicitarUbicacionGPS();
 
@@ -313,7 +332,7 @@ onMounted(() => {
 
     map.addSource('rutas-campus', {
       type: 'geojson',
-      data: datosCampus.rutas || '/rutas.geojson'
+      data: normalizarRutasGeojson(datosCampus.rutas) || '/rutas.geojson'
     });
 
     map.addSource('ruta-activa', {
@@ -470,16 +489,16 @@ onMounted(() => {
       map.getCanvas().style.cursor = '';
     });
 
-    map.on('click', 'rutas-campus-hitbox', (e) => {
+    map.on('click', ['rutas-campus-hitbox', 'rutas-campus-linea'], (e) => {
       if (!props.seleccionandoTramo || !e.features || !e.features.length) return;
       const feat = e.features[0];
       const fProps = feat.properties || {};
-      const idTramo = fProps.id ?? feat.id;
+      const idTramo = fProps.id ?? fProps.ID ?? fProps.fid ?? feat.id;
 
       emit('seleccionar-tramo', {
         id: Number(idTramo) || idTramo,
         habilitado: fProps.habilitado !== false,
-        tipo: fProps.tipo || 'andador',
+        tipo: fProps.tipo || fProps.Tipo || 'andador',
         accesible: fProps.accesible !== false
       });
     });
@@ -532,7 +551,7 @@ const actualizarRutas = (geojson) => {
   if (!map || !geojson) return;
   const fuente = map.getSource('rutas-campus');
   if (fuente) {
-    fuente.setData(geojson);
+    fuente.setData(normalizarRutasGeojson(geojson));
   }
 };
 
