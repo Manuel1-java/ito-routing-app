@@ -57,7 +57,7 @@ defineProps({
   },
   soloEdificios: {
     type: Boolean,
-    default: false
+    default: true
   }
 });
 

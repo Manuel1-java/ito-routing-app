@@ -84,7 +84,7 @@ const edificioActivoId = ref(null);
 const salonActivoId = ref(null);
 const salonActivoNombre = ref('');
 const pisoActivo = ref('PB');
-const soloEdificios = ref(false);
+const soloEdificios = ref(true);
 const idsEdificiosConSalones = ref([]);
 
 const ZOOM_MAX_NORMAL = 21.5;
@@ -957,7 +957,7 @@ onMounted(() => {
       id: 'salones-3d',
       type: 'fill-extrusion',
       source: 'salones-ito',
-      filter: ['==', ['get', 'piso'], 'PB'],
+      filter: ['==', ['get', 'id'], ''],
       paint: {
         'fill-extrusion-color': [
           'case',

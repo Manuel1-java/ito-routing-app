@@ -109,7 +109,7 @@ const distanciaAlGiro = ref(null)
 const distanciaRestante = ref(0)
 
 const pisoActual = ref('PB')
-const soloEdificios = ref(false)
+const soloEdificios = ref(true)
 const rutaAccesible = ref(false)
 
 const menuLateralAbierto = ref(false)
