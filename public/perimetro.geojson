@@ -1,0 +1,13 @@
+{
+"type": "FeatureCollection",
+"name": "perimetro",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "nombre": "Barda perimetral" }, "geometry": { "type": "LineString", "coordinates": [ [ -96.746430671942903, 17.078676272134334 ], [ -96.745581542103594, 17.079046432352449 ] ] } },
+{ "type": "Feature", "properties": { "nombre": "Riberas del Atoyac" }, "geometry": { "type": "LineString", "coordinates": [ [ -96.746467375593241, 17.078384465098811 ], [ -96.744915409896763, 17.075682972311515 ] ] } },
+{ "type": "Feature", "properties": { "nombre": "Calzada Madero" }, "geometry": { "type": "LineString", "coordinates": [ [ -96.744813628852256, 17.075738938870508 ], [ -96.744736837527114, 17.07561477120241 ], [ -96.743220794552258, 17.076332444705454 ] ] } },
+{ "type": "Feature", "properties": { "nombre": "Av. Ferrocarril" }, "geometry": { "type": "LineString", "coordinates": [ [ -96.743176802233833, 17.07636003752059 ], [ -96.742978966955519, 17.076451145872447 ], [ -96.743291859066744, 17.079085999408115 ], [ -96.74337671998876, 17.079282793448122 ] ] } },
+{ "type": "Feature", "properties": { "nombre": "Av. Tecnológico" }, "geometry": { "type": "LineString", "coordinates": [ [ -96.743389214848449, 17.079314030597324 ], [ -96.743667746095568, 17.079917948815336 ], [ -96.745515944090357, 17.079070380833503 ] ] } },
+{ "type": "Feature", "properties": { "nombre": "tec.2" }, "geometry": { "type": "LineString", "coordinates": [ [ -96.746430671942903, 17.078676272134334 ], [ -96.746306764584375, 17.078460800882187 ] ] } }
+]
+}

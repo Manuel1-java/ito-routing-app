@@ -69,11 +69,25 @@ const guardarCacheLocal = async (paquete) => {
   }
 };
 
+export const limpiarCacheCampus = async () => {
+  try {
+    const db = await abrirDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const req = tx.objectStore(STORE_NAME).delete(DATA_KEY);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    console.warn('No se pudo limpiar cache en IndexedDB:', err);
+  }
+};
+
 const cargarRespaldoEstatico = async () => {
   const [resEdificios, resRutas, resLugares] = await Promise.all([
-    fetch('/edificios.geojson'),
-    fetch('/rutas.geojson'),
-    fetch('/lugares.json')
+    fetch('/edificios.geojson', { cache: 'no-cache' }),
+    fetch('/rutas.geojson', { cache: 'no-cache' }),
+    fetch('/lugares.json', { cache: 'no-cache' })
   ]);
 
   const [edificios, rutas, lugares] = await Promise.all([
@@ -139,9 +153,13 @@ export const obtenerDatosCampus = async () => {
     promesaCargaInicial = (async () => {
       let datos = await leerCacheLocal();
 
-      if (!datos) {
-        datos = await cargarRespaldoEstatico();
-        await guardarCacheLocal(datos);
+      if (!datos || !datos.version) {
+        try {
+          datos = await cargarRespaldoEstatico();
+          await guardarCacheLocal(datos);
+        } catch (err) {
+          if (!datos) throw err;
+        }
       }
 
       versionCampusLocal.value = datos.version || 0;

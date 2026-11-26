@@ -1,6 +1,5 @@
 <template>
   <div class="controles-laterales-container">
-    <!-- Botón de Accesibilidad (Ruta sin escaleras) -->
     <div class="accesibilidad-wrapper">
       <transition name="fade">
         <span v-if="mostrarAvisoAccesible" class="aviso-accesible">
@@ -10,6 +9,7 @@
 
       <div class="grupo-control">
         <button
+          type="button"
           class="btn-circular accesibilidad"
           :class="{ 'accesibilidad-activa': modoAccesible }"
           @click="toggleAccesibilidad"
@@ -20,13 +20,23 @@
       </div>
     </div>
 
-    <!-- Selector de Pisos -->
     <div class="grupo-control selector-pisos">
+      <button
+        type="button"
+        class="btn-piso btn-exterior"
+        :class="{ 'piso-activo': soloEdificios }"
+        @click="activarSoloEdificios"
+        title="Solo edificios (ocultar salones)"
+      >
+        <Building2 :size="18" />
+      </button>
+
       <button
         v-for="piso in niveles"
         :key="piso.id"
+        type="button"
         class="btn-piso"
-        :class="{ 'piso-activo': pisoActivo === piso.id }"
+        :class="{ 'piso-activo': !soloEdificios && pisoActual === piso.id }"
         @click="cambiarPiso(piso.id)"
         :title="piso.nombre"
       >
@@ -38,17 +48,26 @@
 
 <script setup>
 import { ref } from 'vue';
-import { Accessibility } from 'lucide-vue-next';
+import { Accessibility, Building2 } from 'lucide-vue-next';
 
-const emit = defineEmits(['cambio-piso', 'cambio-accesibilidad']);
+defineProps({
+  pisoActual: {
+    type: String,
+    default: 'PB'
+  },
+  soloEdificios: {
+    type: Boolean,
+    default: true
+  }
+});
+
+const emit = defineEmits(['cambio-piso', 'cambio-accesibilidad', 'cambio-solo-edificios']);
 
 const modoAccesible = ref(false);
-const pisoActivo = ref('PB');
 const mostrarAvisoAccesible = ref(false);
 let temporizadorAviso = null;
 
 const niveles = [
-  { id: 'P2', etiqueta: 'P2', nombre: 'Segundo Piso' },
   { id: 'P1', etiqueta: 'P1', nombre: 'Primer Piso' },
   { id: 'PB', etiqueta: 'PB', nombre: 'Planta Baja' }
 ];
@@ -64,8 +83,11 @@ const toggleAccesibilidad = () => {
   }, 2200);
 };
 
+const activarSoloEdificios = () => {
+  emit('cambio-solo-edificios', true);
+};
+
 const cambiarPiso = (idPiso) => {
-  pisoActivo.value = idPiso;
   emit('cambio-piso', idPiso);
 };
 </script>
@@ -145,6 +167,9 @@ const cambiarPiso = (idPiso) => {
   color: #475569;
   cursor: pointer;
   border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s ease;
 }
 
@@ -172,7 +197,6 @@ const cambiarPiso = (idPiso) => {
   opacity: 0;
 }
 
-/* En móvil se posiciona debajo de los controles de zoom/GPS de MapLibre */
 @media (max-width: 768px) {
   .controles-laterales-container {
     top: 268px;
