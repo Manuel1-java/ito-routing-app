@@ -12,8 +12,11 @@
 
     <BuscadorSalones
       v-else-if="!guiando"
+      :lugares-extra="salonesComoLugares"
+      :edificios="edificiosGeojson?.features || []"
       @seleccion="manejarSeleccion"
       @abrir-panel-roles="panelRolesAbierto = true"
+      @abrir-menu="menuLateralAbierto = true"
     />
 
     <BannerNavegacion
@@ -26,26 +29,30 @@
       @anterior-paso="irAPaso(indicePasoActual - 1)"
       @siguiente-paso="irAPaso(indicePasoActual + 1)"
     />
-    
-    <ControlesLaterales 
-      @cambio-piso="manejarCambioPiso" 
-      @cambio-accesibilidad="manejarAccesibilidad" 
+
+    <ControlesLaterales
+      :piso-actual="pisoActual"
+      :solo-edificios="soloEdificios"
+      @cambio-piso="manejarCambioPiso"
+      @cambio-solo-edificios="manejarSoloEdificios"
+      @cambio-accesibilidad="manejarAccesibilidad"
     />
-    
-    <MapaCampus 
+
+    <MapaCampus
       ref="mapaRef"
       :tarjeta-abierta="Boolean(lugarActivo)"
       :guiando="guiando"
       :seleccionando-tramo="esperandoTramoMapa"
       :tramo-seleccionado-id="tramoCapturado?.id ?? null"
       @seleccionar-edificio="manejarSeleccionEdificio"
+      @seleccionar-salon="manejarSeleccionSalon"
       @actualizacion-gps="manejarActualizacionGPS"
       @clic-mapa="manejarClicMapa"
       @seleccionar-tramo="manejarSeleccionTramo"
     />
 
-    <TarjetaDestino 
-      :lugar="lugarActivo" 
+    <TarjetaDestino
+      :lugar="lugarActivo"
       :ruta="rutaCalculada"
       :guiando="guiando"
       @cerrar="cerrarDestino"
@@ -64,24 +71,34 @@
       @activar-captura-mapa="activarCapturaCoordenadas"
       @activar-captura-tramo="activarCapturaTramo"
     />
+
+    <MenuLateral
+      v-if="!guiando && !esperandoClicMapa && !esperandoTramoMapa"
+      :abierto="menuLateralAbierto"
+      @toggle="menuLateralAbierto = !menuLateralAbierto"
+      @cerrar="menuLateralAbierto = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import MapaCampus from './components/MapaCampus.vue'
 import BuscadorSalones from './components/BuscadorSalones.vue'
 import BannerNavegacion from './components/BannerNavegacion.vue'
 import TarjetaDestino from './components/TarjetaDestino.vue'
 import ControlesLaterales from './components/ControlesLaterales.vue'
 import PanelRoles from './components/PanelRoles.vue'
-import { calcularRuta, evaluarProgresoRuta } from './utils/pathfinder'
+import MenuLateral from './components/MenuLateral.vue'
+import { calcularRuta, evaluarProgresoRuta, etiquetaPiso } from './utils/pathfinder'
 import { obtenerDatosCampus, suscribirActualizacionCampus } from './services/campusSync'
 import { validarSesionActiva } from './services/api'
 
 const lugarActivo = ref(null)
 const mapaRef = ref(null)
 const rutasGeojson = ref(null)
+const edificiosGeojson = ref(null)
+const salonesGeojson = ref(null)
 const lugaresCatalogo = ref([])
 const rutaCalculada = ref(null)
 const navegando = ref(false)
@@ -92,8 +109,10 @@ const distanciaAlGiro = ref(null)
 const distanciaRestante = ref(0)
 
 const pisoActual = ref('PB')
+const soloEdificios = ref(false)
 const rutaAccesible = ref(false)
 
+const menuLateralAbierto = ref(false)
 const panelRolesAbierto = ref(false)
 const esperandoClicMapa = ref(false)
 const coordenadasCapturadas = ref(null)
@@ -101,16 +120,94 @@ const esperandoTramoMapa = ref(false)
 const tramoCapturado = ref(null)
 let cancelarSuscripcion = null
 
+const centroidePoligono = (geometry) => {
+  if (!geometry) return null
+  if (geometry.type === 'Point') return geometry.coordinates
+  const anillo =
+    geometry.type === 'Polygon'
+      ? geometry.coordinates[0]
+      : geometry.type === 'MultiPolygon'
+        ? geometry.coordinates[0][0]
+        : null
+  if (!anillo || !anillo.length) return null
+
+  const cerrado =
+    anillo.length > 1 &&
+    anillo[0][0] === anillo[anillo.length - 1][0] &&
+    anillo[0][1] === anillo[anillo.length - 1][1]
+  const total = cerrado ? anillo.length - 1 : anillo.length
+
+  let sumLng = 0
+  let sumLat = 0
+  for (let i = 0; i < total; i++) {
+    sumLng += anillo[i][0]
+    sumLat += anillo[i][1]
+  }
+  return [sumLng / total, sumLat / total]
+}
+
+const obtenerMapaEdificios = () => {
+  const mapa = {}
+  for (const feat of edificiosGeojson.value?.features || []) {
+    const id = feat.properties?.id
+    const nombre = feat.properties?.nombre
+    if (id && nombre) {
+      mapa[String(id)] = nombre
+    }
+  }
+  return mapa
+}
+
+const salonesComoLugares = computed(() => {
+  const nombresEdif = obtenerMapaEdificios()
+  return (salonesGeojson.value?.features || [])
+    .map((feat, idx) => {
+      const fProps = feat.properties || {}
+      const nombre = String(fProps.nombre || fProps.Nombre || '').trim()
+      const coords = centroidePoligono(feat.geometry)
+      if (!coords || !nombre || nombre === 'Ejemplo Salon') return null
+      const rawEdif = fProps.edificio_id ?? fProps.Edificio_id ?? null
+      const edifId = rawEdif !== null && rawEdif !== '' ? String(rawEdif).trim() : null
+      const piso = String(fProps.piso || fProps.Piso || 'PB').trim().toUpperCase()
+      const tipo = String(fProps.tipo || fProps.Tipo || 'Aula').trim()
+      const nombreEdif = edifId ? nombresEdif[edifId] : ''
+      return {
+        id: String(fProps.id || fProps.ID || `salon-${idx + 1}`),
+        nombre,
+        descripcion: nombreEdif ? `${nombreEdif} • ${etiquetaPiso(piso)}` : etiquetaPiso(piso),
+        tipo,
+        edificio_id: edifId,
+        piso,
+        coordenadas: coords,
+        palabras_clave: [nombreEdif, piso, tipo].filter(Boolean)
+      }
+    })
+    .filter(Boolean)
+})
+
+const cargarSalones = async () => {
+  try {
+    const res = await fetch('/salones.geojson', { cache: 'no-cache' })
+    if (res.ok) {
+      salonesGeojson.value = await res.json()
+    }
+  } catch {
+    salonesGeojson.value = null
+  }
+}
+
 onMounted(async () => {
   validarSesionActiva()
 
   try {
-    const datos = await obtenerDatosCampus()
+    const [datos] = await Promise.all([obtenerDatosCampus(), cargarSalones()])
     rutasGeojson.value = datos.rutas
+    edificiosGeojson.value = datos.edificios
     lugaresCatalogo.value = datos.lugares
 
     cancelarSuscripcion = suscribirActualizacionCampus((nuevosDatos) => {
       rutasGeojson.value = nuevosDatos.rutas
+      edificiosGeojson.value = nuevosDatos.edificios
       lugaresCatalogo.value = nuevosDatos.lugares
       mapaRef.value?.actualizarEdificios(nuevosDatos.edificios)
       mapaRef.value?.actualizarRutas(nuevosDatos.rutas)
@@ -178,14 +275,63 @@ const manejarSeleccion = (lugar) => {
   rutaCalculada.value = null
   navegando.value = false
 
+  const pisoDestino = String(lugar.piso || 'PB').toUpperCase()
+  const esEspacioInterior = lugar.tipo !== 'Edificio'
+
+  if (esEspacioInterior) {
+    soloEdificios.value = false
+    pisoActual.value = pisoDestino
+  }
+
   if (mapaRef.value) {
     mapaRef.value.limpiarRuta()
-    mapaRef.value.resaltarEdificio(lugar.edificio_id)
+    if (esEspacioInterior) {
+      mapaRef.value.cambiarNivelPiso(pisoDestino)
+    }
+    const salonId = esEspacioInterior ? lugar.id : null
+    const salonNombre = esEspacioInterior ? lugar.nombre : ''
+    mapaRef.value.resaltarEdificio(lugar.edificio_id, salonId, salonNombre)
 
     if (lugar.coordenadas && lugar.coordenadas.length === 2) {
       mapaRef.value.volarACoordenada(lugar.coordenadas[0], lugar.coordenadas[1])
     }
   }
+}
+
+const manejarSeleccionSalon = ({ id, nombre, tipo, piso, edificioId, coordenadas }) => {
+  if (esperandoClicMapa.value || esperandoTramoMapa.value) return
+
+  const pisoNorm = String(piso || 'PB').trim().toUpperCase()
+  const edifNorm = edificioId ? String(edificioId).trim() : ''
+
+  const enCatalogo = lugaresCatalogo.value.find((l) => {
+    if (String(l.id) === String(id)) return true
+    const mismoNombre = normalizar(l.nombre) === normalizar(nombre)
+    const mismoPiso = String(l.piso || 'PB').trim().toUpperCase() === pisoNorm
+    const mismoEdif = !edifNorm || !l.edificio_id || String(l.edificio_id).trim() === edifNorm
+    return mismoNombre && mismoPiso && mismoEdif
+  })
+
+  if (enCatalogo) {
+    manejarSeleccion(enCatalogo)
+    return
+  }
+
+  const nombresEdif = obtenerMapaEdificios()
+  const nombreEdificio = edifNorm ? nombresEdif[edifNorm] : ''
+  const desc = nombreEdificio
+    ? `${nombreEdificio} • ${etiquetaPiso(pisoNorm)}`
+    : etiquetaPiso(pisoNorm)
+
+  manejarSeleccion({
+    id,
+    nombre,
+    descripcion: desc,
+    tipo: tipo || 'Aula',
+    edificio_id: edifNorm || null,
+    piso: pisoNorm,
+    coordenadas
+  })
 }
 
 const manejarSeleccionEdificio = ({ edificioId, nombre, coordenadas }) => {
@@ -202,7 +348,7 @@ const manejarSeleccionEdificio = ({ edificioId, nombre, coordenadas }) => {
   } else if (coincidencias.length > 1) {
     const nombreBase = normalizar(nombre).slice(0, 8)
     lugarEncontrado =
-      coincidencias.find((l) => normalizar(l.nombre).includes(nombreBase)) ||
+      coincidencias.find((l) => l.tipo === 'Edificio' || normalizar(l.nombre).includes(nombreBase)) ||
       coincidencias[0]
   } else {
     lugarEncontrado = {
@@ -211,6 +357,7 @@ const manejarSeleccionEdificio = ({ edificioId, nombre, coordenadas }) => {
       descripcion: 'Edificio del campus',
       tipo: 'Edificio',
       edificio_id: String(edificioId),
+      piso: 'PB',
       coordenadas
     }
   }
@@ -224,6 +371,7 @@ const iniciarRuta = async (lugar, origenPersonalizado = null, ajustarCamara = tr
   if (!rutasGeojson.value) {
     const datos = await obtenerDatosCampus()
     rutasGeojson.value = datos.rutas
+    edificiosGeojson.value = datos.edificios
   }
 
   const rutasHabilitadas = {
@@ -234,17 +382,26 @@ const iniciarRuta = async (lugar, origenPersonalizado = null, ajustarCamara = tr
   }
 
   const origen = origenPersonalizado || mapaRef.value.obtenerUbicacionOrigen()
+  const pisoDestino = String(lugar.piso || 'PB').toUpperCase()
   const resultado = calcularRuta(
     rutasHabilitadas,
     origen.coords,
     lugar.coordenadas,
     rutaAccesible.value,
-    lugar.nombre
+    lugar.nombre,
+    pisoDestino,
+    obtenerMapaEdificios()
   )
 
   if (!resultado) {
     alert('No se encontró un camino conectado hasta ese punto con los filtros actuales.')
     return false
+  }
+
+  if (lugar.tipo !== 'Edificio') {
+    soloEdificios.value = false
+    pisoActual.value = pisoDestino
+    mapaRef.value.cambiarNivelPiso(pisoDestino)
   }
 
   rutaCalculada.value = {
@@ -258,7 +415,7 @@ const iniciarRuta = async (lugar, origenPersonalizado = null, ajustarCamara = tr
   distanciaAlGiro.value = resultado.pasos?.[0]?.distancia ?? null
   distanciaRestante.value = resultado.distancia
 
-  mapaRef.value.dibujarRuta(resultado.coordenadas, ajustarCamara)
+  mapaRef.value.dibujarRuta(resultado, ajustarCamara)
   return true
 }
 
@@ -270,6 +427,7 @@ const iniciarGuia = async () => {
     if (!ok) return
   }
 
+  menuLateralAbierto.value = false
   guiando.value = true
   indicePasoActual.value = 0
   const primerPaso = rutaCalculada.value.pasos[0]
@@ -294,6 +452,12 @@ const irAPaso = (nuevoIndice) => {
   indicePasoActual.value = nuevoIndice
   const paso = pasos[nuevoIndice]
   distanciaAlGiro.value = paso.distancia
+
+  if (paso.piso && (paso.piso !== pisoActual.value || soloEdificios.value)) {
+    soloEdificios.value = false
+    pisoActual.value = paso.piso
+    mapaRef.value?.cambiarNivelPiso(paso.piso)
+  }
 
   const restante = pasos
     .slice(nuevoIndice)
@@ -330,6 +494,13 @@ const manejarActualizacionGPS = async ({ coords, heading }) => {
   distanciaAlGiro.value = progreso.distanciaAlSiguienteGiro
   distanciaRestante.value = progreso.distanciaRestanteTotal
 
+  const pasoActual = rutaCalculada.value.pasos[progreso.nuevoPasoIdx]
+  if (pasoActual?.piso && (pasoActual.piso !== pisoActual.value || soloEdificios.value)) {
+    soloEdificios.value = false
+    pisoActual.value = pasoActual.piso
+    mapaRef.value?.cambiarNivelPiso(pasoActual.piso)
+  }
+
   const rumboCamara =
     heading !== null && !Number.isNaN(heading) ? heading : progreso.rumboActual
   mapaRef.value?.enfocarNavegacion(coords, rumboCamara)
@@ -344,8 +515,14 @@ const cerrarDestino = () => {
 }
 
 const manejarCambioPiso = (piso) => {
+  soloEdificios.value = false
   pisoActual.value = piso
   mapaRef.value?.cambiarNivelPiso(piso)
+}
+
+const manejarSoloEdificios = (activo) => {
+  soloEdificios.value = activo
+  mapaRef.value?.cambiarSoloEdificios(activo)
 }
 
 const manejarAccesibilidad = (estado) => {
