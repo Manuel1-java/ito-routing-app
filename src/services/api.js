@@ -80,3 +80,92 @@ export const validarSesionActiva = async () => {
     return null;
   }
 };
+
+/* =========================================================
+   ENDPOINTS DE EVENTOS DEL CAMPUS Y COMPRESIÓN DE IMAGEN
+   ========================================================= */
+
+export const comprimirImagenAWebP = (archivo, maxLado = 960, calidad = 0.78) => {
+  return new Promise((resolve, reject) => {
+    if (!archivo || !archivo.type.startsWith('image/')) {
+      reject(new Error('Selecciona un archivo de imagen válido.'));
+      return;
+    }
+
+    const lector = new FileReader();
+    lector.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+    lector.onload = (ev) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('No se pudo procesar la imagen.'));
+      img.onload = () => {
+        let ancho = img.width;
+        let alto = img.height;
+
+        if (ancho > maxLado || alto > maxLado) {
+          if (ancho >= alto) {
+            alto = Math.round((alto * maxLado) / ancho);
+            ancho = maxLado;
+          } else {
+            ancho = Math.round((ancho * maxLado) / alto);
+            alto = maxLado;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = ancho;
+        canvas.height = alto;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, ancho, alto);
+
+        let dataUrl = canvas.toDataURL('image/webp', calidad);
+        if (!dataUrl.startsWith('data:image/webp')) {
+          dataUrl = canvas.toDataURL('image/jpeg', calidad);
+        }
+        resolve(dataUrl);
+      };
+      img.src = ev.target.result;
+    };
+    lector.readAsDataURL(archivo);
+  });
+};
+
+export const obtenerEventos = async () => {
+  return apiFetch('/eventos');
+};
+
+export const obtenerEventosPendientes = async () => {
+  return apiFetch('/eventos/pendientes');
+};
+
+export const crearEvento = async (payload) => {
+  return apiFetch('/eventos', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+};
+
+export const resolverEventoPendiente = async (id, estado) => {
+  return apiFetch(`/eventos/${id}/estado`, {
+    method: 'PATCH',
+    body: JSON.stringify({ estado })
+  });
+};
+
+export const posponerEvento = async (id, fecha_inicio, fecha_fin) => {
+  return apiFetch(`/eventos/${id}/posponer`, {
+    method: 'PATCH',
+    body: JSON.stringify({ fecha_inicio, fecha_fin })
+  });
+};
+
+export const eliminarEvento = async (id) => {
+  return apiFetch(`/eventos/${id}`, {
+    method: 'DELETE'
+  });
+};
+
+export const limpiarEventosAnteriores = async () => {
+  return apiFetch('/eventos/anteriores', {
+    method: 'DELETE'
+  });
+};

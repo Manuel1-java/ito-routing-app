@@ -16,7 +16,7 @@
       :edificios="edificiosGeojson?.features || []"
       @seleccion="manejarSeleccion"
       @abrir-panel-roles="panelRolesAbierto = true"
-      @abrir-menu="menuLateralAbierto = true"
+      @abrir-menu="abrirMenuEventos"
     />
 
     <BannerNavegacion
@@ -55,10 +55,13 @@
       :lugar="lugarActivo"
       :ruta="rutaCalculada"
       :guiando="guiando"
+      :eventos="eventosDelLugarActivo"
       @cerrar="cerrarDestino"
       @trazar-ruta="iniciarRuta"
       @iniciar-guia="iniciarGuia"
       @detener-guia="detenerGuia"
+      @ver-imagen="abrirVisorImagen"
+      @abrir-eventos="abrirMenuEventos"
     />
 
     <PanelRoles
@@ -75,14 +78,31 @@
     <MenuLateral
       v-if="!guiando && !esperandoClicMapa && !esperandoTramoMapa"
       :abierto="menuLateralAbierto"
-      @toggle="menuLateralAbierto = !menuLateralAbierto"
+      :eventos-disponibles="eventosDisponibles"
+      :eventos-anteriores="eventosAnteriores"
+      :pendientes="eventosPendientes"
+      :cargando="cargandoEventos"
+      :edificios="edificiosGeojson?.features || []"
+      :salones="salonesComoLugares"
+      @toggle="toggleMenuEventos"
       @cerrar="menuLateralAbierto = false"
+      @recargar-eventos="cargarEventosCampus"
+      @ir-a-evento="ubicarEventoEnMapa"
+      @ver-imagen="abrirVisorImagen"
+      @abrir-panel-roles="panelRolesAbierto = true"
+    />
+
+    <VisorImagen
+      :imagen="imagenAmpliada.imagen"
+      :titulo="imagenAmpliada.titulo"
+      :subtitulo="imagenAmpliada.subtitulo"
+      @cerrar="cerrarVisorImagen"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import MapaCampus from './components/MapaCampus.vue'
 import BuscadorSalones from './components/BuscadorSalones.vue'
 import BannerNavegacion from './components/BannerNavegacion.vue'
@@ -90,9 +110,15 @@ import TarjetaDestino from './components/TarjetaDestino.vue'
 import ControlesLaterales from './components/ControlesLaterales.vue'
 import PanelRoles from './components/PanelRoles.vue'
 import MenuLateral from './components/MenuLateral.vue'
+import VisorImagen from './components/VisorImagen.vue'
 import { calcularRuta, evaluarProgresoRuta, etiquetaPiso } from './utils/pathfinder'
 import { obtenerDatosCampus, suscribirActualizacionCampus } from './services/campusSync'
-import { validarSesionActiva } from './services/api'
+import {
+  usuarioActual,
+  validarSesionActiva,
+  obtenerEventos,
+  obtenerEventosPendientes
+} from './services/api'
 
 const lugarActivo = ref(null)
 const mapaRef = ref(null)
@@ -109,7 +135,7 @@ const distanciaAlGiro = ref(null)
 const distanciaRestante = ref(0)
 
 const pisoActual = ref('PB')
-const soloEdificios = ref(true)
+const soloEdificios = ref(false)
 const rutaAccesible = ref(false)
 
 const menuLateralAbierto = ref(false)
@@ -118,7 +144,31 @@ const esperandoClicMapa = ref(false)
 const coordenadasCapturadas = ref(null)
 const esperandoTramoMapa = ref(false)
 const tramoCapturado = ref(null)
+
+const eventosDisponibles = ref([])
+const eventosAnteriores = ref([])
+const eventosPendientes = ref([])
+const cargandoEventos = ref(false)
+
+const imagenAmpliada = reactive({
+  imagen: null,
+  titulo: '',
+  subtitulo: ''
+})
+
 let cancelarSuscripcion = null
+
+const abrirVisorImagen = ({ imagen, titulo = '', subtitulo = '' }) => {
+  imagenAmpliada.imagen = imagen
+  imagenAmpliada.titulo = titulo
+  imagenAmpliada.subtitulo = subtitulo
+}
+
+const cerrarVisorImagen = () => {
+  imagenAmpliada.imagen = null
+  imagenAmpliada.titulo = ''
+  imagenAmpliada.subtitulo = ''
+}
 
 const centroidePoligono = (geometry) => {
   if (!geometry) return null
@@ -185,6 +235,105 @@ const salonesComoLugares = computed(() => {
     .filter(Boolean)
 })
 
+const normalizar = (txt) =>
+  (txt || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+const eventosDelLugarActivo = computed(() => {
+  const lugar = lugarActivo.value
+  if (!lugar || !eventosDisponibles.value.length) return []
+
+  const edifId = lugar.edificio_id ? String(lugar.edificio_id).trim() : ''
+  if (!edifId) return []
+
+  const delEdificio = eventosDisponibles.value.filter(
+    (ev) => String(ev.edificio_id).trim() === edifId
+  )
+
+  if (lugar.tipo === 'Edificio') {
+    return delEdificio
+  }
+
+  const salonId = String(lugar.id || '').trim()
+  const nombreSalon = normalizar(lugar.nombre)
+
+  return delEdificio.filter((ev) => {
+    if (!ev.salon_id && !ev.salon_nombre) return true
+    if (ev.salon_id && String(ev.salon_id).trim() === salonId) return true
+    if (ev.salon_nombre && normalizar(ev.salon_nombre) === nombreSalon) return true
+    return false
+  })
+})
+
+const cargarEventosCampus = async () => {
+  cargandoEventos.value = true
+  try {
+    const data = await obtenerEventos()
+    eventosDisponibles.value = data.disponibles || []
+    eventosAnteriores.value = data.anteriores || []
+
+    const rol = usuarioActual.value?.rol
+    if (rol === 'ADMIN' || rol === 'MODERADOR') {
+      const pend = await obtenerEventosPendientes()
+      eventosPendientes.value = pend.pendientes || []
+    } else {
+      eventosPendientes.value = []
+    }
+  } catch (err) {
+    console.warn('No se pudieron cargar eventos:', err.message)
+  } finally {
+    cargandoEventos.value = false
+  }
+}
+
+watch(
+  () => usuarioActual.value?.rol,
+  () => {
+    cargarEventosCampus()
+  }
+)
+
+const abrirMenuEventos = () => {
+  menuLateralAbierto.value = true
+  cargarEventosCampus()
+}
+
+const toggleMenuEventos = () => {
+  menuLateralAbierto.value = !menuLateralAbierto.value
+  if (menuLateralAbierto.value) {
+    cargarEventosCampus()
+  }
+}
+
+const ubicarEventoEnMapa = (ev) => {
+  menuLateralAbierto.value = false
+  const edifId = String(ev.edificio_id || '').trim()
+
+  if (ev.salon_id || ev.salon_nombre) {
+    const salonEncontrado = salonesComoLugares.value.find(
+      (s) =>
+        String(s.edificio_id) === edifId &&
+        ((ev.salon_id && String(s.id) === String(ev.salon_id)) ||
+          (ev.salon_nombre && normalizar(s.nombre) === normalizar(ev.salon_nombre)))
+    )
+    if (salonEncontrado) {
+      manejarSeleccion(salonEncontrado)
+      return
+    }
+  }
+
+  const featEdif = (edificiosGeojson.value?.features || []).find(
+    (f) => String(f.properties?.id) === edifId
+  )
+  const coords = centroidePoligono(featEdif?.geometry)
+  const nombre = featEdif?.properties?.nombre || `Edificio ${edifId}`
+
+  manejarSeleccionEdificio({
+    edificioId: edifId,
+    nombre,
+    coordenadas: coords
+  })
+}
+
 const cargarSalones = async () => {
   try {
     const res = await fetch('/salones.geojson', { cache: 'no-cache' })
@@ -197,10 +346,14 @@ const cargarSalones = async () => {
 }
 
 onMounted(async () => {
-  validarSesionActiva()
+  await validarSesionActiva()
 
   try {
-    const [datos] = await Promise.all([obtenerDatosCampus(), cargarSalones()])
+    const [datos] = await Promise.all([
+      obtenerDatosCampus(),
+      cargarSalones(),
+      cargarEventosCampus()
+    ])
     rutasGeojson.value = datos.rutas
     edificiosGeojson.value = datos.edificios
     lugaresCatalogo.value = datos.lugares
@@ -263,9 +416,6 @@ const manejarSeleccionTramo = (tramo) => {
   tramoCapturado.value = { ...tramo, _ts: Date.now() }
   panelRolesAbierto.value = true
 }
-
-const normalizar = (txt) =>
-  (txt || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
 const manejarSeleccion = (lugar) => {
   if (esperandoClicMapa.value || esperandoTramoMapa.value) return
