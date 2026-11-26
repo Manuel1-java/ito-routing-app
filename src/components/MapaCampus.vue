@@ -53,15 +53,24 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  mostrarCaminos: {
+    type: Boolean,
+    default: false
+  },
   tramoSeleccionadoId: {
     type: [Number, String],
     default: null
+  },
+  puntosInteres: {
+    type: Array,
+    default: () => []
   }
 });
 
 const emit = defineEmits([
   'seleccionar-edificio',
   'seleccionar-salon',
+  'seleccionar-punto-interes',
   'actualizacion-gps',
   'clic-mapa',
   'seleccionar-tramo'
@@ -484,6 +493,97 @@ const crearIconoPuerta = () => {
   return ctx.getImageData(0, 0, size, size);
 };
 
+const crearIconoPoi = (colorFondo = '#0284c7', esPersonal = false) => {
+  const size = 60;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.32)';
+  ctx.shadowBlur = 5;
+  ctx.shadowOffsetY = 2;
+
+  ctx.fillStyle = colorFondo;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 19, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 19, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  if (esPersonal) {
+    // Estrella de 5 picos
+    const spikes = 5;
+    const outerRadius = 9;
+    const innerRadius = 4.2;
+    let rot = (Math.PI / 2) * 3;
+    const step = Math.PI / spikes;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - outerRadius);
+    for (let i = 0; i < spikes; i++) {
+      ctx.lineTo(cx + Math.cos(rot) * outerRadius, cy + Math.sin(rot) * outerRadius);
+      rot += step;
+      ctx.lineTo(cx + Math.cos(rot) * innerRadius, cy + Math.sin(rot) * innerRadius);
+      rot += step;
+    }
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    // Destello / marcador central
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  return ctx.getImageData(0, 0, size, size);
+};
+
+const construirGeojsonPuntosInteres = () => {
+  const features = (props.puntosInteres || [])
+    .filter((p) => Array.isArray(p.coordenadas) && p.coordenadas.length >= 2)
+    .map((p) => ({
+      type: 'Feature',
+      properties: {
+        id: String(p.id),
+        nombre: p.nombre || 'Punto de interés',
+        descripcion: p.descripcion || '',
+        esPersonal: Boolean(p.esPersonal),
+        icono: p.esPersonal ? 'icono-poi-personal' : 'icono-poi-campus'
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [Number(p.coordenadas[0]), Number(p.coordenadas[1])]
+      }
+    }));
+
+  return { type: 'FeatureCollection', features };
+};
+
+const actualizarFuentePuntosInteres = () => {
+  if (!map) return;
+  const src = map.getSource('puntos-interes-src');
+  if (src) {
+    src.setData(construirGeojsonPuntosInteres());
+  }
+};
+
+watch(
+  () => props.puntosInteres,
+  () => {
+    actualizarFuentePuntosInteres();
+  },
+  { deep: true }
+);
+
 const solicitarUbicacionGPS = () => {
   if (!('geolocation' in navigator)) return;
 
@@ -517,9 +617,13 @@ const toggleVista = () => {
 const actualizarCapaTramosEdicion = () => {
   if (!map || !map.getLayer('rutas-campus-linea')) return;
 
-  const visibilidad = props.seleccionandoTramo ? 'visible' : 'none';
-  map.setLayoutProperty('rutas-campus-linea', 'visibility', visibilidad);
-  map.setLayoutProperty('rutas-campus-hitbox', 'visibility', visibilidad);
+  const verLineas = props.seleccionandoTramo || props.mostrarCaminos;
+  map.setLayoutProperty('rutas-campus-linea', 'visibility', verLineas ? 'visible' : 'none');
+  map.setLayoutProperty(
+    'rutas-campus-hitbox',
+    'visibility',
+    props.seleccionandoTramo ? 'visible' : 'none'
+  );
 
   const idSel = props.tramoSeleccionadoId !== null ? String(props.tramoSeleccionadoId) : '';
 
@@ -534,7 +638,7 @@ const actualizarCapaTramosEdicion = () => {
 };
 
 watch(
-  () => [props.seleccionandoTramo, props.tramoSeleccionadoId],
+  () => [props.seleccionandoTramo, props.mostrarCaminos, props.tramoSeleccionadoId],
   () => {
     actualizarCapaTramosEdicion();
   }
@@ -804,6 +908,8 @@ onMounted(() => {
     const { puntos: puertasPuntos, umbrales: puertasUmbrales } = construirGeojsonPuertas();
 
     map.addImage('icono-puerta', crearIconoPuerta(), { pixelRatio: 2 });
+    map.addImage('icono-poi-campus', crearIconoPoi('#0284c7', false), { pixelRatio: 2 });
+    map.addImage('icono-poi-personal', crearIconoPoi('#7c3aed', true), { pixelRatio: 2 });
 
     map.addSource('fuente-satelite', {
       type: 'raster',
@@ -837,6 +943,11 @@ onMounted(() => {
     map.addSource('puertas-ito', {
       type: 'geojson',
       data: puertasPuntos
+    });
+
+    map.addSource('puntos-interes-src', {
+      type: 'geojson',
+      data: construirGeojsonPuntosInteres()
     });
 
     map.addSource('rutas-campus', {
@@ -1061,13 +1172,42 @@ onMounted(() => {
     });
 
     map.addLayer({
+      id: 'puntos-interes-capa',
+      type: 'symbol',
+      source: 'puntos-interes-src',
+      minzoom: 16.0,
+      layout: {
+        'icon-image': ['get', 'icono'],
+        'icon-size': 0.85,
+        'icon-anchor': 'center',
+        'icon-allow-overlap': true,
+        'text-field': ['get', 'nombre'],
+        'text-size': 11.5,
+        'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+        'text-radial-offset': 1.25,
+        'text-max-width': 10,
+        'text-optional': true
+      },
+      paint: {
+        'text-color': [
+          'case',
+          ['==', ['get', 'esPersonal'], true],
+          '#5b21b6',
+          '#0369a1'
+        ],
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 2.2
+      }
+    });
+
+    map.addLayer({
       id: 'rutas-campus-linea',
       type: 'line',
       source: 'rutas-campus',
       layout: {
         'line-join': 'round',
         'line-cap': 'round',
-        visibility: props.seleccionandoTramo ? 'visible' : 'none'
+        visibility: props.seleccionandoTramo || props.mostrarCaminos ? 'visible' : 'none'
       },
       paint: {
         'line-color': [
@@ -1189,6 +1329,23 @@ onMounted(() => {
       });
     });
 
+    map.on('mouseenter', 'puntos-interes-capa', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'puntos-interes-capa', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+    map.on('click', 'puntos-interes-capa', (e) => {
+      if (!e.features || !e.features.length) return;
+      const idPoi = String(e.features[0].properties.id || '');
+      const encontrado = (props.puntosInteres || []).find((p) => String(p.id) === idPoi);
+      if (encontrado) {
+        emit('seleccionar-punto-interes', encontrado);
+      }
+    });
+
     map.on('mouseenter', 'puertas-etiquetas', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
@@ -1245,6 +1402,8 @@ onMounted(() => {
       if (!e.features || !e.features.length) return;
       const salonesEnPunto = map.queryRenderedFeatures(e.point, { layers: ['salones-3d'] });
       if (salonesEnPunto.length > 0) return;
+      const poisEnPunto = map.queryRenderedFeatures(e.point, { layers: ['puntos-interes-capa'] });
+      if (poisEnPunto.length > 0) return;
 
       const fProps = e.features[0].properties;
       emit('seleccionar-edificio', {

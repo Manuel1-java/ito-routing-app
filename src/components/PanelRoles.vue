@@ -35,7 +35,7 @@
             :class="{ activo: modoAuth === 'login' }"
             @click="modoAuth = 'login'; limpiarFeedback()"
           >
-            Iniciar Sesion
+            Iniciar Sesión
           </button>
           <button
             :class="{ activo: modoAuth === 'registro' }"
@@ -51,7 +51,7 @@
             <input
               v-model="formAuth.nombre"
               type="text"
-              placeholder="Ej. Manuel Lopez"
+              placeholder="Ej. Manuel López"
               required
             />
           </div>
@@ -67,11 +67,11 @@
           </div>
 
           <div class="campo">
-            <label>Contrasena</label>
+            <label>Contraseña</label>
             <input
               v-model="formAuth.password"
               type="password"
-              placeholder="Minimo 6 caracteres"
+              placeholder="Mínimo 6 caracteres"
               required
             />
           </div>
@@ -107,7 +107,7 @@
             <span class="badge-rol" :class="usuarioActual.rol.toLowerCase()">
               {{ usuarioActual.rol }}
             </span>
-            <button class="btn-salir" title="Cerrar sesion" @click="manejarLogout">
+            <button class="btn-salir" title="Cerrar sesión" @click="manejarLogout">
               <LogOut :size="16" />
             </button>
           </div>
@@ -123,33 +123,24 @@
           <button
             v-if="esModeradorOAdmin"
             :class="{ activo: tabActiva === 'moderar' }"
-            @click="tabActiva = 'moderar'; cargarReportes()"
+            @click="tabActiva = 'moderar'; cargarBandejaModeracion()"
           >
-            Moderacion
+            Moderación
           </button>
           <button
             v-if="esAdmin"
             :class="{ activo: tabActiva === 'admin' }"
             @click="tabActiva = 'admin'; limpiarFeedback()"
           >
-            Administracion
+            Administración
           </button>
         </div>
 
+        <!-- TAB REPORTAR PASO (SIN ID MANUAL) -->
         <form v-if="tabActiva === 'reportar'" @submit.prevent="enviarReporte" class="formulario">
           <p class="ayuda-txt">
-            Reporta un andador cerrado por obras o mantenimiento para que un moderador actualice las rutas.
+            Selecciona el andador cerrado tocándolo en el mapa o eligiéndolo por edificio cercano.
           </p>
-          <div class="campo">
-            <label>ID del tramo de andador</label>
-            <input
-              v-model.number="formReporte.tramo_id"
-              type="number"
-              min="1"
-              placeholder="Ej. 56 o seleccionalo en el mapa"
-              required
-            />
-          </div>
 
           <button
             type="button"
@@ -157,45 +148,41 @@
             @click="$emit('activar-captura-tramo')"
           >
             <MapPin :size="15" />
-            {{ esperandoTramoMapa ? 'Toca un pasillo en el mapa...' : 'Seleccionar tramo tocando el mapa' }}
+            {{ esperandoTramoMapa ? 'Toca un pasillo en el mapa...' : 'Seleccionar andador tocando el mapa' }}
           </button>
+
+          <div class="campo">
+            <label>O elige el tramo por ubicación cercana</label>
+            <select v-model="formReporte.tramo_id" required>
+              <option :value="null" disabled>Selecciona un tramo...</option>
+              <option
+                v-for="tr in tramosDescriptivos"
+                :key="tr.id"
+                :value="tr.id"
+              >
+                {{ tr.titulo }} {{ tr.habilitado ? '' : '(Ya cerrado)' }}
+              </option>
+            </select>
+          </div>
 
           <div class="campo">
             <label>Motivo del bloqueo</label>
             <textarea
               v-model="formReporte.motivo"
               rows="2"
-              placeholder="Ej. Escalera cerrada por reparacion"
+              placeholder="Ej. Escalera cerrada por reparación"
               required
             ></textarea>
           </div>
-          <button type="submit" class="btn-primario" :disabled="cargando">
+          <button type="submit" class="btn-primario" :disabled="cargando || !formReporte.tramo_id">
             Enviar Reporte
           </button>
         </form>
 
+        <!-- TAB MODERACIÓN (TRAMOS + PUNTOS DE INTERÉS) -->
         <div v-if="tabActiva === 'moderar' && esModeradorOAdmin" class="bloque-scroll">
           <form @submit.prevent="cambiarEstadoTramo" class="formulario caja-borde">
-            <strong>Habilitar o cerrar tramo de ruta</strong>
-            <div class="fila-dos">
-              <div class="campo">
-                <label>ID Tramo</label>
-                <input
-                  v-model.number="formTramo.id"
-                  type="number"
-                  min="1"
-                  placeholder="Ej. 10"
-                  required
-                />
-              </div>
-              <div class="campo">
-                <label>Accion</label>
-                <select v-model="formTramo.habilitado">
-                  <option :value="false">Cerrar (Deshabilitar)</option>
-                  <option :value="true">Abrir (Habilitar)</option>
-                </select>
-              </div>
-            </div>
+            <strong>Abrir o cerrar tramo de ruta</strong>
 
             <button
               type="button"
@@ -203,22 +190,84 @@
               @click="$emit('activar-captura-tramo')"
             >
               <MapPin :size="15" />
-              {{ esperandoTramoMapa ? 'Toca un pasillo en el mapa...' : 'Seleccionar tramo tocando el mapa' }}
+              {{ esperandoTramoMapa ? 'Toca un pasillo en el mapa...' : 'Tocar tramo en el mapa' }}
             </button>
 
-            <button type="submit" class="btn-primario" :disabled="cargando">
+            <div class="campo">
+              <label>Tramo seleccionado</label>
+              <select v-model="formTramo.id" required>
+                <option :value="null" disabled>Selecciona un tramo...</option>
+                <option
+                  v-for="tr in tramosDescriptivos"
+                  :key="tr.id"
+                  :value="tr.id"
+                >
+                  {{ tr.titulo }} — {{ tr.habilitado ? 'Abierto' : 'Cerrado' }}
+                </option>
+              </select>
+            </div>
+
+            <div class="campo">
+              <label>Acción</label>
+              <select v-model="formTramo.habilitado">
+                <option :value="false">Cerrar (Deshabilitar paso)</option>
+                <option :value="true">Abrir (Habilitar paso)</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn-primario" :disabled="cargando || !formTramo.id">
               Aplicar Cambio en Mapa
             </button>
           </form>
 
+          <!-- Sugerencias de Puntos de Interés pendientes -->
+          <div v-if="sugerenciasPendientes.length > 0" class="lista-reportes">
+            <strong>Puntos de interés sugeridos ({{ sugerenciasPendientes.length }})</strong>
+            <div v-for="sug in sugerenciasPendientes" :key="sug.id" class="item-reporte item-poi">
+              <div class="rep-top">
+                <span>{{ sug.nombre }}</span>
+                <span class="rep-estado">Por aprobar</span>
+              </div>
+              <p v-if="sug.descripcion">{{ sug.descripcion }}</p>
+              <small>Sugerido por: {{ sug.sugerido_por }}</small>
+
+              <div class="rep-acciones">
+                <button
+                  type="button"
+                  class="btn-ubicar-mini"
+                  @click="$emit('enfocar-coordenadas', [Number(sug.longitud), Number(sug.latitud)])"
+                >
+                  Ver en mapa
+                </button>
+                <button
+                  type="button"
+                  class="btn-aprobar"
+                  :disabled="cargando"
+                  @click="procesarSugerenciaPoi(sug.id, 'aprobado')"
+                >
+                  Aprobar
+                </button>
+                <button
+                  type="button"
+                  class="btn-rechazar"
+                  :disabled="cargando"
+                  @click="procesarSugerenciaPoi(sug.id, 'rechazado')"
+                >
+                  Rechazar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reportes de cierre de andadores -->
           <div class="lista-reportes">
-            <strong>Reportes recientes ({{ reportes.length }})</strong>
+            <strong>Reportes de pasos ({{ reportes.length }})</strong>
             <div v-if="reportes.length === 0" class="vacio-txt">
               No hay reportes registrados.
             </div>
             <div v-for="rep in reportes" :key="rep.id" class="item-reporte">
               <div class="rep-top">
-                <span>Tramo #{{ rep.tramo_id }}</span>
+                <span>{{ nombreLegibleTramo(rep.tramo_id) }}</span>
                 <span
                   class="rep-estado"
                   :class="rep.estado === 'resuelto' || (rep.estado === 'aprobado' && rep.tramo_habilitado) ? 'resuelto' : rep.estado"
@@ -228,20 +277,6 @@
               </div>
               <p>{{ rep.motivo }}</p>
               <small>Por: {{ rep.reportado_por }}</small>
-
-              <div
-                v-if="rep.estado === 'resuelto' || (rep.estado === 'aprobado' && rep.tramo_habilitado)"
-                class="rep-aviso-activo"
-              >
-                Este tramo ya se volvio a habilitar en el mapa.
-              </div>
-
-              <div
-                v-else-if="rep.estado === 'aprobado'"
-                class="rep-aviso-cerrado"
-              >
-                Este tramo sigue deshabilitado en el mapa.
-              </div>
 
               <div v-if="rep.estado === 'pendiente'" class="rep-acciones">
                 <button
@@ -265,38 +300,40 @@
           </div>
         </div>
 
+        <!-- TAB ADMINISTRACIÓN -->
         <div v-if="tabActiva === 'admin' && esAdmin" class="bloque-scroll">
           <form @submit.prevent="crearNuevoLugar" class="formulario caja-borde">
-            <strong>Agregar nuevo salon o punto de interes</strong>
+            <strong>Agregar punto de interés o espacio</strong>
             <div class="fila-dos">
-              <div class="campo">
-                <label>ID unico</label>
-                <input v-model="formLugar.id" type="text" placeholder="Ej. aula-sc2" required />
-              </div>
               <div class="campo">
                 <label>Tipo</label>
                 <select v-model="formLugar.tipo">
+                  <option value="Punto de Interés">Punto de Interés</option>
+                  <option value="Edificio">Edificio</option>
                   <option value="Aula">Aula</option>
                   <option value="Laboratorio">Laboratorio</option>
                   <option value="Departamento">Departamento</option>
                   <option value="Administrativo">Administrativo</option>
                   <option value="Servicio">Servicio</option>
-                  <option value="Punto de Interés">Punto de Interes</option>
                 </select>
+              </div>
+              <div class="campo">
+                <label>ID (opcional)</label>
+                <input v-model="formLugar.id" type="text" placeholder="Automático" />
               </div>
             </div>
 
             <div class="campo">
               <label>Nombre del lugar</label>
-              <input v-model="formLugar.nombre" type="text" placeholder="Ej. Aula SC-2" required />
+              <input v-model="formLugar.nombre" type="text" placeholder="Ej. Bancas Jardín Central" required />
             </div>
 
             <div class="campo">
-              <label>Descripcion</label>
+              <label>Descripción corta (opcional)</label>
               <input
                 v-model="formLugar.descripcion"
                 type="text"
-                placeholder="Ej. Edificio I, Planta Alta"
+                placeholder="Ej. Área de descanso junto a cafetería"
               />
             </div>
 
@@ -333,7 +370,7 @@
             </button>
 
             <button type="submit" class="btn-primario" :disabled="cargando">
-              Guardar en Base de Datos
+              Guardar y mostrar en mapa
             </button>
           </form>
 
@@ -365,7 +402,9 @@ import {
   iniciarSesion,
   registrarCuenta,
   cerrarSesion,
-  apiFetch
+  apiFetch,
+  obtenerSugerenciasLugar,
+  resolverSugerenciaLugar
 } from '../services/api.js';
 import {
   versionCampusLocal,
@@ -378,10 +417,16 @@ const props = defineProps({
   coordenadasCapturadas: { type: Array, default: null },
   esperandoClicMapa: { type: Boolean, default: false },
   tramoCapturado: { type: Object, default: null },
-  esperandoTramoMapa: { type: Boolean, default: false }
+  esperandoTramoMapa: { type: Boolean, default: false },
+  tramosDescriptivos: { type: Array, default: () => [] }
 });
 
-const emit = defineEmits(['cerrar', 'activar-captura-mapa', 'activar-captura-tramo']);
+const emit = defineEmits([
+  'cerrar',
+  'activar-captura-mapa',
+  'activar-captura-tramo',
+  'enfocar-coordenadas'
+]);
 
 const modoAuth = ref('login');
 const tabActiva = ref('reportar');
@@ -393,12 +438,13 @@ const formAuth = ref({ nombre: '', correo: '', password: '' });
 const formReporte = ref({ tramo_id: null, motivo: '' });
 const formTramo = ref({ id: null, habilitado: false });
 const reportes = ref([]);
+const sugerenciasPoi = ref([]);
 
 const formLugar = ref({
   id: '',
   nombre: '',
   descripcion: '',
-  tipo: 'Aula',
+  tipo: 'Punto de Interés',
   longitud: null,
   latitud: null
 });
@@ -409,11 +455,20 @@ const esModeradorOAdmin = computed(() =>
 );
 const esAdmin = computed(() => usuarioActual.value?.rol === 'ADMIN');
 
+const sugerenciasPendientes = computed(() =>
+  sugerenciasPoi.value.filter((s) => s.estado === 'pendiente')
+);
+
 const etiquetaSync = computed(() => {
   if (estadoSync.value === 'actualizado') return 'Conectado';
   if (estadoSync.value === 'sincronizando') return 'Sincronizando';
   return 'Modo Offline';
 });
+
+const nombreLegibleTramo = (id) => {
+  const hallado = (props.tramosDescriptivos || []).find((t) => String(t.id) === String(id));
+  return hallado ? hallado.titulo : `Tramo #${id}`;
+};
 
 watch(
   () => props.coordenadasCapturadas,
@@ -430,18 +485,16 @@ watch(
   () => props.tramoCapturado,
   (tramo) => {
     if (!tramo || !tramo.id) return;
+    const desc = nombreLegibleTramo(tramo.id);
 
     if (tabActiva.value === 'reportar') {
       formReporte.value.tramo_id = tramo.id;
-      mostrarFeedback(`Tramo #${tramo.id} seleccionado desde el mapa.`, 'exito');
+      mostrarFeedback(`Seleccionado: ${desc}`, 'exito');
     } else if (tabActiva.value === 'moderar') {
       formTramo.value.id = tramo.id;
       formTramo.value.habilitado = !tramo.habilitado;
       const estadoTxt = tramo.habilitado ? 'abierto' : 'cerrado';
-      mostrarFeedback(
-        `Tramo #${tramo.id} seleccionado (actualmente ${estadoTxt}).`,
-        'exito'
-      );
+      mostrarFeedback(`${desc} (actualmente ${estadoTxt}).`, 'exito');
     }
   }
 );
@@ -468,11 +521,11 @@ const rellenarDemo = (correo, password) => {
 const forzarSync = async () => {
   const res = await sincronizarConServidor(versionCampusLocal.value);
   if (res) {
-    mostrarFeedback(`Datos actualizados a la version ${res.version}.`, 'exito');
+    mostrarFeedback(`Datos actualizados a la versión ${res.version}.`, 'exito');
   } else if (estadoSync.value === 'actualizado') {
-    mostrarFeedback('El dispositivo ya tiene la version mas reciente.', 'exito');
+    mostrarFeedback('El dispositivo ya tiene la versión más reciente.', 'exito');
   } else {
-    mostrarFeedback('Sin conexion con el servidor. Usando cache local.', 'error');
+    mostrarFeedback('Sin conexión con el servidor. Usando caché local.', 'error');
   }
 };
 
@@ -520,13 +573,34 @@ const enviarReporte = async () => {
   }
 };
 
-const cargarReportes = async () => {
+const cargarBandejaModeracion = async () => {
   limpiarFeedback();
   try {
-    const res = await apiFetch('/campus/reportes');
-    reportes.value = res.reportes || [];
+    const [resRep, resSug] = await Promise.all([
+      apiFetch('/campus/reportes'),
+      obtenerSugerenciasLugar().catch(() => ({ sugerencias: [] }))
+    ]);
+    reportes.value = resRep.reportes || [];
+    sugerenciasPoi.value = resSug.sugerencias || [];
   } catch (err) {
     mostrarFeedback(err.message, 'error');
+  }
+};
+
+const procesarSugerenciaPoi = async (sugId, estado) => {
+  cargando.value = true;
+  limpiarFeedback();
+  try {
+    const res = await resolverSugerenciaLugar(sugId, estado);
+    if (estado === 'aprobado') {
+      await sincronizarConServidor(versionCampusLocal.value);
+    }
+    await cargarBandejaModeracion();
+    mostrarFeedback(res.mensaje, 'exito');
+  } catch (err) {
+    mostrarFeedback(err.message, 'error');
+  } finally {
+    cargando.value = false;
   }
 };
 
@@ -541,7 +615,7 @@ const procesarReporte = async (reporteId, estado) => {
     if (estado === 'aprobado') {
       await sincronizarConServidor(versionCampusLocal.value);
     }
-    await cargarReportes();
+    await cargarBandejaModeracion();
     mostrarFeedback(res.mensaje, 'exito');
   } catch (err) {
     mostrarFeedback(err.message, 'error');
@@ -559,7 +633,7 @@ const cambiarEstadoTramo = async () => {
       body: JSON.stringify({ habilitado: formTramo.value.habilitado })
     });
     await sincronizarConServidor(versionCampusLocal.value);
-    await cargarReportes();
+    await cargarBandejaModeracion();
     mostrarFeedback(res.mensaje, 'exito');
   } catch (err) {
     mostrarFeedback(err.message, 'error');
@@ -572,12 +646,13 @@ const crearNuevoLugar = async () => {
   cargando.value = true;
   limpiarFeedback();
   try {
+    const coords = [Number(formLugar.value.longitud), Number(formLugar.value.latitud)];
     const payload = {
-      id: formLugar.value.id,
+      id: formLugar.value.id.trim() || `poi-${Date.now()}`,
       nombre: formLugar.value.nombre,
-      descripcion: formLugar.value.descripcion,
+      descripcion: formLugar.value.descripcion || 'Punto de interés del campus',
       tipo: formLugar.value.tipo,
-      coordenadas: [formLugar.value.longitud, formLugar.value.latitud],
+      coordenadas: coords,
       palabras_clave: [formLugar.value.nombre.toLowerCase()]
     };
     const res = await apiFetch('/campus/lugares', {
@@ -590,10 +665,11 @@ const crearNuevoLugar = async () => {
       id: '',
       nombre: '',
       descripcion: '',
-      tipo: 'Aula',
+      tipo: 'Punto de Interés',
       longitud: null,
       latitud: null
     };
+    emit('enfocar-coordenadas', coords);
   } catch (err) {
     mostrarFeedback(err.message, 'error');
   } finally {
@@ -957,17 +1033,24 @@ textarea:focus {
   padding: 8px 10px;
 }
 
+.item-poi {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+
 .rep-top {
   display: flex;
   justify-content: space-between;
   font-weight: 700;
   font-size: 12px;
   color: #1e293b;
+  gap: 6px;
 }
 
 .rep-estado {
   color: #d97706;
   text-transform: capitalize;
+  flex-shrink: 0;
 }
 
 .rep-estado.aprobado {
@@ -980,26 +1063,6 @@ textarea:focus {
 
 .rep-estado.resuelto {
   color: #0284c7;
-}
-
-.rep-aviso-activo {
-  margin-top: 6px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: #e0f2fe;
-  color: #0369a1;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.rep-aviso-cerrado {
-  margin-top: 6px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: #fee2e2;
-  color: #991b1b;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .item-reporte p {
@@ -1017,6 +1080,17 @@ textarea:focus {
   display: flex;
   gap: 6px;
   margin-top: 8px;
+}
+
+.btn-ubicar-mini {
+  border: 1px solid #93c5fd;
+  background: #ffffff;
+  color: #1d4ed8;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .btn-aprobar,
@@ -1038,11 +1112,6 @@ textarea:focus {
 .btn-rechazar {
   background: #fee2e2;
   color: #991b1b;
-}
-
-.btn-aprobar:disabled,
-.btn-rechazar:disabled {
-  opacity: 0.6;
 }
 
 .vacio-txt {

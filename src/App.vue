@@ -1,8 +1,11 @@
 <template>
   <div class="app-wrapper">
-    <div v-if="esperandoClicMapa || esperandoTramoMapa" class="banner-captura">
+    <div v-if="esperandoClicMapa || esperandoTramoMapa || esperandoPoiMapa" class="banner-captura">
       <span v-if="esperandoTramoMapa">
         Toca un pasillo en el mapa (Verde: abierto, Rojo: cerrado)
+      </span>
+      <span v-else-if="esperandoPoiMapa">
+        Toca en el mapa dónde quieres guardar tu punto de interés
       </span>
       <span v-else>
         Toca cualquier punto en el mapa para capturar sus coordenadas
@@ -12,7 +15,7 @@
 
     <BuscadorSalones
       v-else-if="!guiando"
-      :lugares-extra="salonesComoLugares"
+      :lugares-extra="[...puntosPersonales, ...salonesComoLugares]"
       :edificios="edificiosGeojson?.features || []"
       @seleccion="manejarSeleccion"
       @abrir-panel-roles="panelRolesAbierto = true"
@@ -43,6 +46,7 @@
       :tarjeta-abierta="Boolean(lugarActivo)"
       :guiando="guiando"
       :seleccionando-tramo="esperandoTramoMapa"
+      :mostrar-caminos="mostrarCaminos"
       :tramo-seleccionado-id="tramoCapturado?.id ?? null"
       @seleccionar-edificio="manejarSeleccionEdificio"
       @seleccionar-salon="manejarSeleccionSalon"
@@ -70,13 +74,15 @@
       :esperando-clic-mapa="esperandoClicMapa"
       :tramo-capturado="tramoCapturado"
       :esperando-tramo-mapa="esperandoTramoMapa"
+      :tramos-descriptivos="tramosDescriptivos"
       @cerrar="cerrarPanelRoles"
       @activar-captura-mapa="activarCapturaCoordenadas"
       @activar-captura-tramo="activarCapturaTramo"
+      @enfocar-coordenadas="manejarEnfocarCoordenadas"
     />
 
     <MenuLateral
-      v-if="!guiando && !esperandoClicMapa && !esperandoTramoMapa"
+      v-if="!guiando && !esperandoClicMapa && !esperandoTramoMapa && !esperandoPoiMapa"
       :abierto="menuLateralAbierto"
       :eventos-disponibles="eventosDisponibles"
       :eventos-anteriores="eventosAnteriores"
@@ -84,12 +90,20 @@
       :cargando="cargandoEventos"
       :edificios="edificiosGeojson?.features || []"
       :salones="salonesComoLugares"
+      :lugares-catalogo="lugaresCatalogo"
+      :tramos-descriptivos="tramosDescriptivos"
+      :mostrar-caminos="mostrarCaminos"
+      :coordenadas-poi-capturadas="coordenadasPoiCapturadas"
       @toggle="toggleMenuEventos"
       @cerrar="menuLateralAbierto = false"
       @recargar-eventos="cargarEventosCampus"
       @ir-a-evento="ubicarEventoEnMapa"
       @ver-imagen="abrirVisorImagen"
       @abrir-panel-roles="panelRolesAbierto = true"
+      @seleccionar-lugar-menu="manejarSeleccionDesdeMenu"
+      @toggle-mostrar-caminos="manejarToggleMostrarCaminos"
+      @enfocar-tramo="manejarEnfocarTramo"
+      @activar-captura-poi="activarCapturaPoi"
     />
 
     <VisorImagen
@@ -113,6 +127,7 @@ import MenuLateral from './components/MenuLateral.vue'
 import VisorImagen from './components/VisorImagen.vue'
 import { calcularRuta, evaluarProgresoRuta, etiquetaPiso } from './utils/pathfinder'
 import { obtenerDatosCampus, suscribirActualizacionCampus } from './services/campusSync'
+import { puntosPersonales } from './services/puntosPersonales'
 import {
   usuarioActual,
   validarSesionActiva,
@@ -137,6 +152,7 @@ const distanciaRestante = ref(0)
 const pisoActual = ref('PB')
 const soloEdificios = ref(false)
 const rutaAccesible = ref(false)
+const mostrarCaminos = ref(false)
 
 const menuLateralAbierto = ref(false)
 const panelRolesAbierto = ref(false)
@@ -144,6 +160,8 @@ const esperandoClicMapa = ref(false)
 const coordenadasCapturadas = ref(null)
 const esperandoTramoMapa = ref(false)
 const tramoCapturado = ref(null)
+const esperandoPoiMapa = ref(false)
+const coordenadasPoiCapturadas = ref(null)
 
 const eventosDisponibles = ref([])
 const eventosAnteriores = ref([])
@@ -168,6 +186,12 @@ const cerrarVisorImagen = () => {
   imagenAmpliada.imagen = null
   imagenAmpliada.titulo = ''
   imagenAmpliada.subtitulo = ''
+}
+
+const distanciaAprox = (c1, c2) => {
+  const dx = (c2[0] - c1[0]) * 106000
+  const dy = (c2[1] - c1[1]) * 111000
+  return Math.hypot(dx, dy)
 }
 
 const centroidePoligono = (geometry) => {
@@ -207,6 +231,55 @@ const obtenerMapaEdificios = () => {
   }
   return mapa
 }
+
+const tramosDescriptivos = computed(() => {
+  const edifs = (edificiosGeojson.value?.features || [])
+    .map((f) => ({
+      nombre: f.properties?.nombre || `Edificio ${f.properties?.id}`,
+      coords: centroidePoligono(f.geometry)
+    }))
+    .filter((e) => Array.isArray(e.coords))
+
+  const edificioMasCercano = (coord) => {
+    if (!edifs.length || !Array.isArray(coord)) return 'Andador'
+    let mejor = edifs[0].nombre
+    let minD = Infinity
+    for (const e of edifs) {
+      const d = distanciaAprox(coord, e.coords)
+      if (d < minD) {
+        minD = d
+        mejor = e.nombre
+      }
+    }
+    return mejor
+  }
+
+  return (rutasGeojson.value?.features || []).map((f, idx) => {
+    const p = f.properties || {}
+    const coords =
+      f.geometry?.type === 'MultiLineString'
+        ? f.geometry.coordinates.flat()
+        : f.geometry?.coordinates || []
+    const inicio = coords[0] || null
+    const fin = coords[coords.length - 1] || inicio
+    const centro = coords.length ? coords[Math.floor(coords.length / 2)] : null
+    const id = p.id ?? idx + 1
+    const habilitado = p.habilitado !== false
+
+    const e1 = edificioMasCercano(inicio)
+    const e2 = edificioMasCercano(fin)
+    const titulo =
+      p.nombre ||
+      (e1 === e2 ? `Andador junto a ${e1} (#${id})` : `${e1} ↔ ${e2} (#${id})`)
+
+    return {
+      id,
+      titulo,
+      habilitado,
+      coordsCentro: centro
+    }
+  })
+})
 
 const salonesComoLugares = computed(() => {
   const nombresEdif = obtenerMapaEdificios()
@@ -334,6 +407,38 @@ const ubicarEventoEnMapa = (ev) => {
   })
 }
 
+const manejarSeleccionDesdeMenu = (lugar) => {
+  menuLateralAbierto.value = false
+  manejarSeleccion(lugar)
+}
+
+const manejarToggleMostrarCaminos = (visible) => {
+  mostrarCaminos.value = visible
+  mapaRef.value?.cambiarVisibilidadRutas?.(visible)
+}
+
+const manejarEnfocarTramo = (tramo) => {
+  menuLateralAbierto.value = false
+  manejarToggleMostrarCaminos(true)
+  if (tramo?.coordsCentro && mapaRef.value) {
+    mapaRef.value.volarACoordenada(tramo.coordsCentro[0], tramo.coordsCentro[1])
+  }
+}
+
+const activarCapturaPoi = () => {
+  esperandoClicMapa.value = false
+  esperandoTramoMapa.value = false
+  esperandoPoiMapa.value = true
+  menuLateralAbierto.value = false
+}
+
+const manejarEnfocarCoordenadas = (coords) => {
+  panelRolesAbierto.value = false
+  if (Array.isArray(coords) && coords.length === 2 && mapaRef.value) {
+    mapaRef.value.volarACoordenada(coords[0], coords[1])
+  }
+}
+
 const cargarSalones = async () => {
   try {
     const res = await fetch('/salones.geojson', { cache: 'no-cache' })
@@ -380,21 +485,29 @@ onUnmounted(() => {
 
 const activarCapturaCoordenadas = () => {
   esperandoTramoMapa.value = false
+  esperandoPoiMapa.value = false
   esperandoClicMapa.value = true
   panelRolesAbierto.value = false
 }
 
 const activarCapturaTramo = () => {
   esperandoClicMapa.value = false
+  esperandoPoiMapa.value = false
   tramoCapturado.value = null
   esperandoTramoMapa.value = true
   panelRolesAbierto.value = false
 }
 
 const cancelarCapturaMapa = () => {
+  const eraPoi = esperandoPoiMapa.value
   esperandoClicMapa.value = false
   esperandoTramoMapa.value = false
-  panelRolesAbierto.value = true
+  esperandoPoiMapa.value = false
+  if (eraPoi) {
+    menuLateralAbierto.value = true
+  } else {
+    panelRolesAbierto.value = true
+  }
 }
 
 const cerrarPanelRoles = () => {
@@ -404,6 +517,13 @@ const cerrarPanelRoles = () => {
 }
 
 const manejarClicMapa = (coords) => {
+  if (esperandoPoiMapa.value) {
+    esperandoPoiMapa.value = false
+    coordenadasPoiCapturadas.value = coords
+    menuLateralAbierto.value = true
+    return
+  }
+
   if (!esperandoClicMapa.value) return
   esperandoClicMapa.value = false
   coordenadasCapturadas.value = coords
@@ -418,7 +538,7 @@ const manejarSeleccionTramo = (tramo) => {
 }
 
 const manejarSeleccion = (lugar) => {
-  if (esperandoClicMapa.value || esperandoTramoMapa.value) return
+  if (esperandoClicMapa.value || esperandoTramoMapa.value || esperandoPoiMapa.value) return
 
   detenerGuia()
   lugarActivo.value = lugar
@@ -426,7 +546,10 @@ const manejarSeleccion = (lugar) => {
   navegando.value = false
 
   const pisoDestino = String(lugar.piso || 'PB').toUpperCase()
-  const esEspacioInterior = lugar.tipo !== 'Edificio'
+  const esEspacioInterior =
+    Boolean(lugar.edificio_id) &&
+    lugar.tipo !== 'Edificio' &&
+    lugar.tipo !== 'Punto de Interés'
 
   if (esEspacioInterior) {
     soloEdificios.value = false
@@ -449,7 +572,7 @@ const manejarSeleccion = (lugar) => {
 }
 
 const manejarSeleccionSalon = ({ id, nombre, tipo, piso, edificioId, coordenadas }) => {
-  if (esperandoClicMapa.value || esperandoTramoMapa.value) return
+  if (esperandoClicMapa.value || esperandoTramoMapa.value || esperandoPoiMapa.value) return
 
   const pisoNorm = String(piso || 'PB').trim().toUpperCase()
   const edifNorm = edificioId ? String(edificioId).trim() : ''
@@ -485,7 +608,7 @@ const manejarSeleccionSalon = ({ id, nombre, tipo, piso, edificioId, coordenadas
 }
 
 const manejarSeleccionEdificio = ({ edificioId, nombre, coordenadas }) => {
-  if (esperandoClicMapa.value || esperandoTramoMapa.value) return
+  if (esperandoClicMapa.value || esperandoTramoMapa.value || esperandoPoiMapa.value) return
 
   const coincidencias = lugaresCatalogo.value.filter(
     (l) => String(l.edificio_id) === String(edificioId)
@@ -548,7 +671,7 @@ const iniciarRuta = async (lugar, origenPersonalizado = null, ajustarCamara = tr
     return false
   }
 
-  if (lugar.tipo !== 'Edificio') {
+  if (lugar.edificio_id && lugar.tipo !== 'Edificio' && lugar.tipo !== 'Punto de Interés') {
     soloEdificios.value = false
     pisoActual.value = pisoDestino
     mapaRef.value.cambiarNivelPiso(pisoDestino)

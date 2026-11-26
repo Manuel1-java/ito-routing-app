@@ -84,6 +84,14 @@
         <div class="botones-superiores">
           <button
             class="btn-icono-circular"
+            :class="{ 'btn-favorito-activo': esFavorito }"
+            @click="alternarFavorito"
+            :title="esFavorito ? 'Quitar de mis lugares' : 'Guardar en mis lugares'"
+          >
+            <Star :size="18" :fill="esFavorito ? 'currentColor' : 'none'" />
+          </button>
+          <button
+            class="btn-icono-circular"
             @click="minimizada = true"
             title="Minimizar tarjeta"
           >
@@ -107,6 +115,9 @@
             <p class="descripcion">{{ lugar.descripcion }}</p>
             <div class="etiquetas-row">
               <span class="etiqueta-tipo">{{ lugar.tipo }}</span>
+              <span v-if="lugar.esPersonal" class="etiqueta-personal">
+                Solo en tu dispositivo
+              </span>
               <span v-if="ruta?.soloAccesible" class="etiqueta-accesible">
                 <Accessibility :size="14" /> Sin escaleras
               </span>
@@ -237,6 +248,7 @@
 import { ref, computed, watch } from 'vue';
 import {
   X,
+  Star,
   ChevronDown,
   ChevronUp,
   ChevronLeft,
@@ -262,6 +274,7 @@ import {
   MapPin,
   Wrench
 } from 'lucide-vue-next';
+import { esLugarFavorito, toggleLugarFavorito } from '../services/puntosPersonales.js';
 
 const props = defineProps({
   lugar: {
@@ -293,6 +306,12 @@ const emit = defineEmits([
 
 const minimizada = ref(false);
 const indiceEvento = ref(0);
+
+const esFavorito = computed(() => esLugarFavorito(props.lugar));
+
+const alternarFavorito = () => {
+  toggleLugarFavorito(props.lugar);
+};
 
 watch(
   () => props.lugar?.id,
@@ -568,11 +587,20 @@ const iconoComponente = computed(() => {
   justify-content: center;
   cursor: pointer;
   color: #64748b;
-  transition: background 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
 .btn-icono-circular:hover {
   background: #e2e8f0;
+}
+
+.btn-favorito-activo {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.btn-favorito-activo:hover {
+  background: #fde68a;
 }
 
 .tarjeta-header {
@@ -597,7 +625,7 @@ const iconoComponente = computed(() => {
 .info-principal {
   display: flex;
   flex-direction: column;
-  padding-right: 68px;
+  padding-right: 112px;
 }
 
 .nombre {
@@ -621,6 +649,15 @@ const iconoComponente = computed(() => {
 .etiqueta-tipo {
   background: #e0f2fe;
   color: #0369a1;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.etiqueta-personal {
+  background: #f3e8ff;
+  color: #6b21a8;
   padding: 3px 10px;
   border-radius: 12px;
   font-size: 12px;

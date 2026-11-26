@@ -169,3 +169,25 @@ export const limpiarEventosAnteriores = async () => {
     method: 'DELETE'
   });
 };
+
+/* =========================================================
+   SUGERENCIAS Y MODERACIÓN DE PUNTOS DE INTERÉS
+   ========================================================= */
+
+export const crearSugerenciaLugar = async (payload) => {
+  return apiFetch('/campus/sugerencias-lugar', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+};
+
+export const obtenerSugerenciasLugar = async () => {
+  return apiFetch('/campus/sugerencias-lugar');
+};
+
+export const resolverSugerenciaLugar = async (id, estado) => {
+  return apiFetch(`/campus/sugerencias-lugar/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ estado })
+  });
+};
