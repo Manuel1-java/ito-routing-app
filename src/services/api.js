@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://ito-routing-api.onrender.com/api';
 
 const TOKEN_KEY = 'ito_routing_token';
 const USER_KEY = 'ito_routing_user';
